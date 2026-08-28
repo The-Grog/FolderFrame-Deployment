@@ -1,0 +1,25 @@
+{
+  "sources": [
+    { "id": "photos", "label": "Photos", "path": "photos/" }
+  ],
+  "defaults": {
+    "source": "photos",
+    "album": "",
+    "view": "folders",
+    "sort": "filename",
+    "interval": 5,
+    "imageMode": "fit",
+    "shuffle": false,
+    "autoRefresh": true,
+    "tvMode": false,
+    "autoplay": false,
+    "controls": true,
+    "showFilenames": true,
+    "rememberPreferences": true
+  },
+  "index": { "refreshInterval": 60 },
+  "embed": {
+    "refreshInterval": 300,
+    "rememberPreferences": false
+  }
+}

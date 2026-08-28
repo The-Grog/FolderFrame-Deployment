@@ -1,0 +1,16 @@
+**
+!Dockerfile
+!Caddyfile
+!app/
+!app/index.html
+!app/embed.html
+!app/styles.css
+!app/app.js
+!app/settings.js
+!app/resilience.js
+!app/heic2any.min.js
+!app/folderframe.config.json
+!app/LICENSE
+!app/docs/
+!app/docs/images/
+!app/docs/images/folderframe-logo.png

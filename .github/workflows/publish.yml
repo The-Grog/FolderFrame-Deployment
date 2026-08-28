@@ -1,0 +1,41 @@
+name: Publish test image
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Build and smoke-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t folderframe:ci .
+          docker run -d --name smoke -p 127.0.0.1:8088:8080 folderframe:ci
+          trap 'docker logs smoke; docker rm -f smoke' EXIT
+          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8088/ -o /tmp/index.html
+          curl --fail http://127.0.0.1:8088/docs/images/folderframe-logo.png -o /tmp/logo.png
+          test -s /tmp/logo.png
+          curl --fail http://127.0.0.1:8088/photos/ -o /tmp/listing.html
+          for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile; do
+            test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/$path")" = 404
+          done
+      - name: Publish to GHCR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          docker tag folderframe:ci "$image:test"
+          docker tag folderframe:ci "$image:sha-$GITHUB_SHA"
+          docker push "$image:test"
+          docker push "$image:sha-$GITHUB_SHA"
