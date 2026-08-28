@@ -1,41 +1,109 @@
-name: Publish test image
+name: Publish release image
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '23 9 * * *'
+  push:
+    branches: [main]
 permissions:
   contents: read
-  packages: write
+concurrency:
+  group: folderframe-release
+  cancel-in-progress: false
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
-      - name: Build and smoke-test
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker build --pull --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t folderframe:ci .
-          docker run -d --name smoke -p 127.0.0.1:8088:8080 folderframe:ci
-          trap 'docker logs smoke; docker rm -f smoke' EXIT
-          curl --retry 10 --retry-all-errors --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 --fail http://127.0.0.1:8088/ -o /tmp/index.html
-          curl --fail http://127.0.0.1:8088/docs/images/folderframe-logo.png -o /tmp/logo.png
-          test -s /tmp/logo.png
-          curl --fail http://127.0.0.1:8088/photos/ -o /tmp/listing.html
-          for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile; do
-            test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/$path")" = 404
-          done
-      - name: Publish to GHCR
-        shell: bash
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
+  publish:
+    if: github.event_name != 'push'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Resolve latest published stable release
+        id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/resolve_release.py
+      - name: Check whether this release and recipe are already published
+        if: steps.release.outputs.available == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_SHA: ${{ steps.release.outputs.sha }}
+          APP_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
         run: |
           set -euo pipefail
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
-          docker tag folderframe:ci "$image:test"
-          docker tag folderframe:ci "$image:sha-$GITHUB_SHA"
-          docker push "$image:test"
-          docker push "$image:sha-$GITHUB_SHA"
+          ready=false
+          if docker pull "$image:test"; then
+            source_sha=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image:test")
+            recipe_sha=$(docker inspect -f '{{ index .Config.Labels "io.folderframe.deployment-revision" }}' "$image:test")
+            version=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image:test")
+            if [[ "$source_sha" == "$APP_SHA" && "$recipe_sha" == "$GITHUB_SHA" && "$version" == "$APP_TAG" ]]; then
+              ready=true
+            fi
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+      - name: Fetch app from the release commit
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: The-Grog/FolderFrame
+          ref: ${{ steps.release.outputs.sha }}
+          path: upstream
+          persist-credentials: false
+      - name: Build and smoke-test
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        env:
+          APP_SHA: ${{ steps.release.outputs.sha }}
+          APP_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$APP_SHA" \
+            --label "org.opencontainers.image.version=$APP_TAG" \
+            --label "io.folderframe.deployment-revision=$GITHUB_SHA" \
+            -t folderframe:ci .
+          docker run -d --name smoke -p 127.0.0.1:8088:8080 folderframe:ci
+          trap 'docker logs smoke; docker rm -f smoke' EXIT
+          curl --retry 10 --retry-all-errors --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 --fail http://127.0.0.1:8088/ -o /tmp/index.html
+          for asset in docs/images/folderframe-logo.png docs/images/folderframe-icon.png styles.css app.js settings.js resilience.js; do
+            curl --fail "http://127.0.0.1:8088/$asset" -o /tmp/asset
+            test -s /tmp/asset
+          done
+          curl --fail http://127.0.0.1:8088/photos/ -o /tmp/listing.html
+          for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile; do
+            test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/$path")" = 404
+          done
+      - name: Publish to GHCR
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_SHA: ${{ steps.release.outputs.sha }}
+          APP_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          for tag in "build-${APP_SHA:0:12}-${GITHUB_SHA:0:12}" "$APP_TAG" test; do
+            docker tag folderframe:ci "$image:$tag"
+            docker push "$image:$tag"
+          done

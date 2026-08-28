@@ -1,4 +1,3 @@
-# Deny by default; never force-add test-media or private files.
 /*
 !/.gitignore
 !/.dockerignore
@@ -11,19 +10,7 @@
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/publish.yml
-!/app/
-/app/*
-!/app/index.html
-!/app/embed.html
-!/app/styles.css
-!/app/app.js
-!/app/settings.js
-!/app/resilience.js
-!/app/heic2any.min.js
-!/app/folderframe.config.json
-!/app/LICENSE
-!/app/docs/
-/app/docs/*
-!/app/docs/images/
-/app/docs/images/*
-!/app/docs/images/folderframe-logo.png
+!/scripts/
+/scripts/*
+!/scripts/resolve_release.py
+!/scripts/test_resolve_release.py
