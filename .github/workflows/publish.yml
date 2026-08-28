@@ -19,7 +19,7 @@ jobs:
           docker build --pull --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t folderframe:ci .
           docker run -d --name smoke -p 127.0.0.1:8088:8080 folderframe:ci
           trap 'docker logs smoke; docker rm -f smoke' EXIT
-          curl --retry 10 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8088/ -o /tmp/index.html
+          curl --retry 10 --retry-all-errors --retry-delay 1 --retry-max-time 30 --connect-timeout 2 --max-time 5 --fail http://127.0.0.1:8088/ -o /tmp/index.html
           curl --fail http://127.0.0.1:8088/docs/images/folderframe-logo.png -o /tmp/logo.png
           test -s /tmp/logo.png
           curl --fail http://127.0.0.1:8088/photos/ -o /tmp/listing.html
