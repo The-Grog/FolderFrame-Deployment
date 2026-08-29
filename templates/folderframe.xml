@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Container version="2">
   <Name>folderframe</Name>
-  <Repository>ghcr.io/the-grog/folderframe-deployment:v0.5</Repository>
+  <Repository>ghcr.io/the-grog/folderframe-deployment:v0.6</Repository>
   <Registry>https://github.com/The-Grog/FolderFrame-Deployment/pkgs/container/folderframe-deployment</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame/v0.5/docs/images/folderframe-icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame/v0.6/docs/images/folderframe-icon.png</Icon>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <Overview>FolderFrame is a folder-based photo and video gallery with album browsing and slideshows, served by Caddy. Select a dedicated media folder; it is mounted read-only. Anyone who can reach the WebUI can download its media. No authentication or TLS is configured. Use on a trusted LAN, or add access controls before public exposure. Do not select an entire share, source repository, private files, or a folder containing symlinks.</Overview>
   <Project>https://github.com/The-Grog/FolderFrame</Project>
