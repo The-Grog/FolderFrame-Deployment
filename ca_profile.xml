@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommunityApplications>
+  <Profile>FolderFrame Deployment publishes and maintains the Unraid Docker template for FolderFrame, a folder-based photo and video gallery served by Caddy. Support is provided through the deployment repository's GitHub Issues.</Profile>
+  <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame/main/docs/images/folderframe-icon.png</Icon>
+  <WebPage>https://github.com/The-Grog/FolderFrame-Deployment</WebPage>
+  <Forum>https://github.com/The-Grog/FolderFrame-Deployment/issues</Forum>
+</CommunityApplications>

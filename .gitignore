@@ -18,3 +18,4 @@
 !/templates/
 /templates/*
 !/templates/folderframe.xml
+!/ca_profile.xml

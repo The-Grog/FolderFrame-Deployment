@@ -49,10 +49,10 @@ jobs:
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
           ready=false
-          if docker pull "$image:test"; then
-            source_sha=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image:test")
-            recipe_sha=$(docker inspect -f '{{ index .Config.Labels "io.folderframe.deployment-revision" }}' "$image:test")
-            version=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image:test")
+          if docker pull "$image:stable"; then
+            source_sha=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image:stable")
+            recipe_sha=$(docker inspect -f '{{ index .Config.Labels "io.folderframe.deployment-revision" }}' "$image:stable")
+            version=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image:stable")
             if [[ "$source_sha" == "$APP_SHA" && "$recipe_sha" == "$GITHUB_SHA" && "$version" == "$APP_TAG" ]]; then
               ready=true
             fi
@@ -103,7 +103,7 @@ jobs:
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
-          for tag in "build-${APP_SHA:0:12}-${GITHUB_SHA:0:12}" "$APP_TAG" test; do
+          for tag in "build-${APP_SHA:0:12}-${GITHUB_SHA:0:12}" "$APP_TAG" test stable; do
             docker tag folderframe:ci "$image:$tag"
             docker push "$image:$tag"
           done
