@@ -6,8 +6,9 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame/main/docs/images/folderframe-icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame-Deployment/main/icon.png</Icon>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Category>MediaApp:Photos</Category>
   <Overview>FolderFrame is a folder-based photo and video gallery with album browsing and slideshows, served by Caddy. Select a dedicated media folder; it is mounted read-only. Anyone who can reach the WebUI can download its media. No authentication or TLS is configured. Use on a trusted LAN, or add access controls before public exposure. Do not select an entire share, source repository, private files, or a folder containing symlinks.</Overview>
   <Project>https://github.com/The-Grog/FolderFrame</Project>
   <Support>https://github.com/The-Grog/FolderFrame-Deployment/issues</Support>

@@ -23,3 +23,4 @@
 !/compose.yaml
 !/.env.example
 !/scripts/test_public_metadata.py
+!/icon.png
