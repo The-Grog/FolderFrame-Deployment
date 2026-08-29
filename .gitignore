@@ -14,3 +14,7 @@
 /scripts/*
 !/scripts/resolve_release.py
 !/scripts/test_resolve_release.py
+!/UNRAID.md
+!/templates/
+/templates/*
+!/templates/folderframe.xml

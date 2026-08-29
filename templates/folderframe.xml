@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Container version="2">
+  <Name>folderframe</Name>
+  <Repository>ghcr.io/the-grog/folderframe-deployment:v0.5</Repository>
+  <Registry>https://github.com/The-Grog/FolderFrame-Deployment/pkgs/container/folderframe-deployment</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame/v0.5/docs/images/folderframe-icon.png</Icon>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Overview>FolderFrame is a folder-based photo and video gallery with album browsing and slideshows, served by Caddy. Select a dedicated media folder; it is mounted read-only. Anyone who can reach the WebUI can download its media. No authentication or TLS is configured. Use on a trusted LAN, or add access controls before public exposure. Do not select an entire share, source repository, private files, or a folder containing symlinks.</Overview>
+  <Project>https://github.com/The-Grog/FolderFrame</Project>
+  <Support>https://github.com/The-Grog/FolderFrame-Deployment/issues</Support>
+  <TemplateURL>https://raw.githubusercontent.com/The-Grog/FolderFrame-Deployment/main/templates/folderframe.xml</TemplateURL>
+  <ReadMe>https://github.com/The-Grog/FolderFrame-Deployment/blob/main/UNRAID.md</ReadMe>
+  <License>MIT</License>
+  <Config Name="Web Port" Target="8080" Default="8088" Mode="tcp" Description="Choose an unused host port for the gallery." Type="Port" Display="always" Required="true" Mask="false">8088</Config>
+  <Config Name="Media Folder" Target="/media" Default="" Mode="ro" Description="Select an existing dedicated gallery folder. Read-only does not prevent downloads. Do not select a whole share or repository." Type="Path" Display="always" Required="true" Mask="false" />
+</Container>
