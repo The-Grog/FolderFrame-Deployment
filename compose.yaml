@@ -1,0 +1,12 @@
+services:
+  folderframe:
+    image: ghcr.io/the-grog/folderframe-deployment:stable
+    container_name: folderframe
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8088}:8080"
+    volumes:
+      - type: bind
+        source: ${MEDIA_PATH:?Set MEDIA_PATH in .env to an absolute existing media directory}
+        target: /media
+        read_only: true

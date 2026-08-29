@@ -18,6 +18,8 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Validate Docker Compose example
+        run: MEDIA_PATH=/tmp/folderframe-media docker compose config --quiet
   publish:
     if: github.event_name != 'push'
     needs: validate

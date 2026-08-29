@@ -19,3 +19,7 @@
 /templates/*
 !/templates/folderframe.xml
 !/ca_profile.xml
+!/MAINTAINERS.md
+!/compose.yaml
+!/.env.example
+!/scripts/test_public_metadata.py

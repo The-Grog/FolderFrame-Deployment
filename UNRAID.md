@@ -1,17 +1,46 @@
-# Unraid installation test
+# Install FolderFrame on Unraid
 
-Template: templates/folderframe.xml
+The template is available at `templates/folderframe.xml`. It uses the tested `stable` image channel.
 
-This template is not yet tested in the Unraid form or submitted to Community Apps.
+## Local template installation
 
-Copy the XML to /boot/config/plugins/dockerMan/templates-user/my-folderframe.xml on Unraid, without overwriting an existing file. Then open Docker > Add Container and select folderframe.
+Copy the template into Unraid's user-template directory:
 
-Before Apply, choose an existing dedicated Media Folder and confirm the Web Port is unused. Port 8088 is currently used by folderframe-test: stop that container first or use a different verified port. The new container is named folderframe.
+```sh
+mkdir -p /boot/config/plugins/dockerMan/templates-user
+cp /path/to/FolderFrame-Deployment/templates/folderframe.xml \
+  /boot/config/plugins/dockerMan/templates-user/my-folderframe.xml
+```
 
-The /media mount is read-only. Do not mount an entire share, repository, private files or symlinks. Anyone who reaches this service can download its media. No authentication or TLS is configured. No appdata mount or privileged mode is needed.
+In the Unraid WebGUI, open **Docker > Add Container**, select **folderframe** from the Template list, and review every field before applying.
 
-Use WebUI after installing and verify photos, albums, video seeking and restart behavior.
+## Required settings
 
-The image is uses the stable release channel, so future app releases require changing the image tag. Choose a moving stable channel before Community Apps submission if desired. The release workflow never updates running containers.
+- **Web Port:** an unused host port. The template suggests 8088 and maps it to container port 8080.
+- **Media Folder:** an existing dedicated directory containing only media intended for this gallery. It is mounted at `/media` read-only.
 
-Community Apps submission still requires repository profile metadata, validation and installation testing.
+No appdata mapping, database, privileged mode, host network, PUID, or PGID is required.
+
+## Verify the installation
+
+After applying the template:
+
+1. Open **WebUI** from the container menu.
+2. Confirm nested folders and images appear.
+3. Test video playback and seeking with a browser-compatible sample.
+4. Restart the container and confirm the same media returns.
+5. Edit the container and verify the `/media` mapping still shows **Read Only**.
+
+## Updating
+
+The template uses `ghcr.io/the-grog/folderframe-deployment:stable`. Use **Docker > Check for Updates**, review the FolderFrame release notes, and update when ready. Unraid recreates the container while preserving the external media directory.
+
+For rollback, edit the Repository field to a known version tag such as `ghcr.io/the-grog/folderframe-deployment:v0.6.3`, then Apply.
+
+## Security
+
+FolderFrame has no built-in authentication or TLS. Anyone who can reach it can download the mounted media. Keep it on a trusted network unless a separate access layer provides authentication and TLS. Never mount an entire share, repository, secrets, private files, or symlinks to private locations.
+
+## Community Apps status
+
+The repository includes template and profile metadata, but maintainers must still validate, scan, and complete review through the official Community Apps submission portal.
