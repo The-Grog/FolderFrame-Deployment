@@ -12,6 +12,6 @@ The /media mount is read-only. Do not mount an entire share, repository, private
 
 Use WebUI after installing and verify photos, albums, video seeking and restart behavior.
 
-The image is pinned to v0.6, so future app releases require changing the image tag. Choose a moving stable channel before Community Apps submission if desired. The release workflow never updates running containers.
+The image is pinned to v0.6.1, so future app releases require changing the image tag. Choose a moving stable channel before Community Apps submission if desired. The release workflow never updates running containers.
 
 Community Apps submission still requires repository profile metadata, validation and installation testing.
