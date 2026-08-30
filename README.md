@@ -1,6 +1,6 @@
 # FolderFrame Deployment
 
-Docker and Unraid packaging for [FolderFrame](https://github.com/The-Grog/FolderFrame), a folder-based photo and video gallery served by Caddy.
+Docker and Unraid packaging for [FolderFrame](https://www.folderframe.com/), a folder-based photo and video gallery served by Caddy. Source code for the app is available in the [FolderFrame repository](https://github.com/The-Grog/FolderFrame).
 
 ## Quick start with Docker
 
@@ -25,7 +25,17 @@ Copy `.env.example` to `.env`, set `MEDIA_PATH` to an absolute existing director
 docker compose up -d
 ```
 
-See [Unraid installation](UNRAID.md) for the Unraid template.
+## Install from Unraid Community Apps
+
+**Available in Unraid Community Apps.**
+
+1. Open the **Apps** tab in Unraid and search for **FolderFrame**.
+2. Select FolderFrame.
+3. Choose the host media folder that FolderFrame should display. It is mounted read-only inside the container.
+4. Choose an unused host port for the WebUI.
+5. Click **Apply**, then open the FolderFrame WebUI.
+
+See [Unraid installation](UNRAID.md) for field details, updates, and troubleshooting.
 
 ## Configuration
 
