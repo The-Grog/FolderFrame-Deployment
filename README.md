@@ -4,14 +4,17 @@ Docker and Unraid packaging for [FolderFrame](https://www.folderframe.com/), a f
 
 ## Quick start with Docker
 
-Choose an existing directory containing only media you intend to expose. The mount is read-only, but anyone who can reach FolderFrame can download those files.
+Choose an existing directory containing only media you intend to expose, plus a persistent configuration directory. The media mount is read-only, but anyone who can reach FolderFrame can download those files.
 
 ```sh
+mkdir -p /absolute/path/to/folderframe-config
+
 docker run -d \
   --name folderframe \
   --restart unless-stopped \
   -p 8088:8080 \
   --mount type=bind,source=/absolute/path/to/media,target=/media,readonly \
+  --mount type=bind,source=/absolute/path/to/folderframe-config,target=/config \
   ghcr.io/the-grog/folderframe-deployment:stable
 ```
 
@@ -19,11 +22,13 @@ Open `http://SERVER-IP:8088/`. Change the host port if 8088 is already in use.
 
 ## Quick start with Docker Compose
 
-Copy `.env.example` to `.env`, set `MEDIA_PATH` to an absolute existing directory, then run:
+Copy `.env.example` to `.env`, set `MEDIA_PATH` to an absolute existing directory, and optionally set `CONFIG_PATH` or common FolderFrame overrides. Then run:
 
 ```sh
 docker compose up -d
 ```
+
+The default `CONFIG_PATH` is `./config`. The container creates `folderframe.config.json` there on first start.
 
 ## Install from Unraid Community Apps
 
@@ -32,8 +37,10 @@ docker compose up -d
 1. Open the **Apps** tab in Unraid and search for **FolderFrame**.
 2. Select FolderFrame.
 3. Choose the host media folder that FolderFrame should display. It is mounted read-only inside the container.
-4. Choose an unused host port for the WebUI.
-5. Click **Apply**, then open the FolderFrame WebUI.
+4. Keep the default appdata configuration path or choose another persistent directory.
+5. Choose an unused host port for the WebUI.
+6. Optionally set common FolderFrame defaults; blank fields use the persistent JSON configuration.
+7. Click **Apply**, then open the FolderFrame WebUI.
 
 See [Unraid installation](UNRAID.md) for field details, updates, and troubleshooting.
 
@@ -43,8 +50,11 @@ See [Unraid installation](UNRAID.md) for field details, updates, and troubleshoo
 | --- | --- | --- |
 | HTTP port | `8080/tcp` | Map any unused host port to this container port. |
 | Media path | `/media` | Bind-mount a dedicated host media directory read-only. |
+| Configuration path | `/config` | Bind-mount a persistent directory read/write. The default JSON file is created on first start. |
 
-FolderFrame requires no database, appdata directory, privileged mode, host networking, PUID, or PGID.
+FolderFrame requires no database, privileged mode, host networking, PUID, or PGID. The appdata/configuration directory contains only administrator-managed configuration.
+
+Common settings can be supplied with the environment variables documented in [Unraid installation](UNRAID.md). Blank variables defer to `/config/folderframe.config.json`; explicit variables override the corresponding JSON values without rewriting that file.
 
 ## Image tags
 
@@ -58,6 +68,7 @@ Updates never modify a running container automatically. Pull the image and recre
 ## Security and exposure
 
 - There is no authentication or TLS inside this container.
+- The generated configuration is publicly readable by anyone who can reach the app. Never put secrets in it.
 - Anyone who can reach the service can browse and download mounted media.
 - Use a dedicated media directory. Do not mount a whole share, home directory, source repository, secrets, or symlinks to private locations.
 - Read-only prevents writes from the container; it does not prevent downloads.

@@ -1,22 +1,29 @@
 {
-    admin off
-    auto_https off
+	admin off
+	auto_https off
 }
 
 :8080 {
-    # The app's default source is photos/. Media is mounted separately.
-    redir /photos /photos/ 308
-    handle_path /photos/* {
-        root * /media
-        header Cache-Control "no-store"
-        file_server browse {
-            hide .*
-        }
-    }
+	# Serve the generated runtime configuration before other app assets.
+	handle /folderframe.config.json {
+		root * /run/folderframe
+		header Cache-Control "no-store"
+		file_server
+	}
 
-    handle {
-        root * /srv/app
-        header Cache-Control "no-cache"
-        file_server
-    }
+	# The app's default source is photos/. Media is mounted separately.
+	redir /photos /photos/ 308
+	handle_path /photos/* {
+		root * /media
+		header Cache-Control "no-store"
+		file_server browse {
+			hide .*
+		}
+	}
+
+	handle {
+		root * /srv/app
+		header Cache-Control "no-cache"
+		file_server
+	}
 }

@@ -3,6 +3,7 @@
 !/.dockerignore
 !/Dockerfile
 !/Caddyfile
+!/docker-entrypoint.sh
 !/README.md
 !/LICENSE
 !/.github/

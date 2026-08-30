@@ -9,12 +9,23 @@
   <Icon>https://raw.githubusercontent.com/The-Grog/FolderFrame-Deployment/main/icon.png</Icon>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <Category>MediaApp:Photos</Category>
-  <Overview>FolderFrame is a folder-based photo and video gallery with album browsing and slideshows, served by Caddy. Select a dedicated media folder; it is mounted read-only. Anyone who can reach the WebUI can download its media. No authentication or TLS is configured. Use on a trusted LAN, or add access controls before public exposure. Do not select an entire share, source repository, private files, or a folder containing symlinks.</Overview>
-  <Project>https://github.com/The-Grog/FolderFrame</Project>
+  <Overview>FolderFrame is a folder-based photo and video gallery with album browsing and slideshows, served by Caddy. Select a dedicated media folder; it is mounted read-only. Configuration is stored separately in appdata. Anyone who can reach the WebUI can download its media. No authentication or TLS is configured. Use on a trusted LAN, or add access controls before public exposure. Do not select an entire share, source repository, private files, or a folder containing symlinks.</Overview>
+  <Project>https://www.folderframe.com/</Project>
   <Support>https://github.com/The-Grog/FolderFrame-Deployment/issues</Support>
   <TemplateURL>https://raw.githubusercontent.com/The-Grog/FolderFrame-Deployment/main/templates/folderframe.xml</TemplateURL>
   <ReadMe>https://github.com/The-Grog/FolderFrame-Deployment/blob/main/UNRAID.md</ReadMe>
   <License>MIT</License>
   <Config Name="Web Port" Target="8080" Default="8088" Mode="tcp" Description="Choose an unused host port for the gallery." Type="Port" Display="always" Required="true" Mask="false">8088</Config>
   <Config Name="Media Folder" Target="/media" Default="" Mode="ro" Description="Select an existing dedicated gallery folder. Read-only does not prevent downloads. Do not select a whole share or repository." Type="Path" Display="always" Required="true" Mask="false" />
+  <Config Name="Appdata Configuration" Target="/config" Default="/mnt/user/appdata/folderframe" Mode="rw" Description="Persistent FolderFrame configuration. The default JSON file is created automatically on first start." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/folderframe</Config>
+  <Config Name="Source Label" Target="FOLDERFRAME_SOURCE_LABEL" Default="" Mode="" Description="Optional label for the mounted media source. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Starting View" Target="FOLDERFRAME_STARTING_VIEW" Default="" Mode="" Description="Optional starting view: folders or all. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Default Sort" Target="FOLDERFRAME_DEFAULT_SORT" Default="" Mode="" Description="Optional default sort: filename, newest, or oldest. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Slideshow Interval" Target="FOLDERFRAME_SLIDESHOW_INTERVAL" Default="" Mode="" Description="Optional photo duration in seconds: 3, 5, 10, 15, 30, 60, 300, 900, or 3600. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Image Display Mode" Target="FOLDERFRAME_IMAGE_MODE" Default="" Mode="" Description="Optional image sizing: fit or original. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Start Automatically" Target="FOLDERFRAME_AUTOPLAY" Default="" Mode="" Description="Optional slideshow startup: true or false. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Shuffle by Default" Target="FOLDERFRAME_SHUFFLE" Default="" Mode="" Description="Optional shuffle default: true or false. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Gallery Refresh Interval" Target="FOLDERFRAME_GALLERY_REFRESH_INTERVAL" Default="" Mode="" Description="Optional gallery rescan interval from 1 to 86400 seconds. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Embed Refresh Interval" Target="FOLDERFRAME_EMBED_REFRESH_INTERVAL" Default="" Mode="" Description="Optional embed rescan interval from 1 to 86400 seconds. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Remember Browser Preferences" Target="FOLDERFRAME_REMEMBER_PREFERENCES" Default="" Mode="" Description="Optional preference persistence: true or false. Blank uses folderframe.config.json." Type="Variable" Display="always" Required="false" Mask="false" />
 </Container>

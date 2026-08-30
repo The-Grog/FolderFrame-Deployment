@@ -1,6 +1,7 @@
 **
 !Dockerfile
 !Caddyfile
+!docker-entrypoint.sh
 !upstream/
 !upstream/docs/
 !upstream/docs/images/
