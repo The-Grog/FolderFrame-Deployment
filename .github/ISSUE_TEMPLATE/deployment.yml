@@ -1,0 +1,64 @@
+name: Deployment problem
+description: Report a Docker, Unraid, Caddy, image-build, mount, or container update problem.
+title: "[Deployment]: "
+labels:
+  - deployment
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository handles FolderFrame container and deployment problems. Gallery, viewer, browser, configuration, and codec bugs belong in the [main FolderFrame repository](https://github.com/The-Grog/FolderFrame/issues/new/choose).
+        Remove credentials, tunnel tokens, private hostnames, personal media, and private paths before submitting.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Deployment platform
+      options:
+        - Unraid
+        - Docker Compose
+        - Docker CLI
+        - Other container platform
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: FolderFrame image tag or version
+      placeholder: latest, release tag, or image digest
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What failed, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Sanitized deployment configuration
+      description: Include ports, volume mappings, image tag, web-server settings, and relevant environment values. Remove secrets and private paths.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste the smallest useful sanitized log section.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I confirmed this is a container, mount, image, proxy, or deployment problem rather than an app/browser problem.
+          required: true
+        - label: I removed secrets, tokens, credentials, private hostnames, and personal media.
+          required: true

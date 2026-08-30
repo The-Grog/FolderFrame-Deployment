@@ -11,6 +11,10 @@
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/publish.yml
+!/.github/ISSUE_TEMPLATE/
+/.github/ISSUE_TEMPLATE/*
+!/.github/ISSUE_TEMPLATE/config.yml
+!/.github/ISSUE_TEMPLATE/deployment.yml
 !/scripts/
 /scripts/*
 !/scripts/resolve_release.py
