@@ -14,6 +14,7 @@ PUBLIC_TEXT = [
     ROOT / "Dockerfile",
     ROOT / "Caddyfile",
     ROOT / "docker-entrypoint.sh",
+    ROOT / "thumbnail_worker.py",
 ]
 PRIVATE_MARKERS = (
     "grogpool",
@@ -33,6 +34,10 @@ UNRAID_OVERRIDES = {
     "Gallery Refresh Interval": "FOLDERFRAME_GALLERY_REFRESH_INTERVAL",
     "Embed Refresh Interval": "FOLDERFRAME_EMBED_REFRESH_INTERVAL",
     "Remember Browser Preferences": "FOLDERFRAME_REMEMBER_PREFERENCES",
+}
+THUMBNAIL_OVERRIDES = {
+    "Generate Thumbnails": ("FOLDERFRAME_THUMBNAILS", "true"),
+    "Thumbnail Scan Interval": ("FOLDERFRAME_THUMBNAIL_INTERVAL", "3600"),
 }
 
 
@@ -66,13 +71,17 @@ class PublicMetadataTests(unittest.TestCase):
         actual = {
             name: attrs["Target"]
             for name, attrs in configs.items()
-            if attrs["Type"] == "Variable"
+            if attrs["Type"] == "Variable" and name not in THUMBNAIL_OVERRIDES
         }
         self.assertEqual(actual, UNRAID_OVERRIDES)
         for name in UNRAID_OVERRIDES:
             with self.subTest(name=name):
                 self.assertEqual(configs[name]["Default"], "")
                 self.assertEqual(configs[name]["Required"], "false")
+        for name, (target, default) in THUMBNAIL_OVERRIDES.items():
+            with self.subTest(name=name):
+                self.assertEqual(configs[name]["Target"], target)
+                self.assertEqual(configs[name]["Default"], default)
 
     def test_community_apps_profile_is_complete(self):
         root = ET.parse(ROOT / "ca_profile.xml").getroot()
@@ -90,6 +99,8 @@ class PublicMetadataTests(unittest.TestCase):
         for variable in UNRAID_OVERRIDES.values():
             with self.subTest(variable=variable):
                 self.assertIn(f"{variable}:", text)
+        self.assertIn('FOLDERFRAME_THUMBNAILS: "${FOLDERFRAME_THUMBNAILS:-true}"', text)
+        self.assertIn('FOLDERFRAME_THUMBNAIL_INTERVAL: "${FOLDERFRAME_THUMBNAIL_INTERVAL:-3600}"', text)
         self.assertNotIn("privileged:", text)
 
     def test_container_serves_generated_config(self):
@@ -99,6 +110,8 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn('VOLUME ["/config"]', dockerfile)
         self.assertIn('ENTRYPOINT ["/usr/bin/folderframe-entrypoint"]', dockerfile)
         self.assertIn("handle /folderframe.config.json", caddyfile)
+        self.assertIn("handle_path /thumbnails/*", caddyfile)
+        self.assertIn("root * /config/thumbnails", caddyfile)
         self.assertIn("root * /run/folderframe", caddyfile)
         self.assertIn("config_dir=/config", entrypoint)
         self.assertIn('persistent_config="$config_dir/folderframe.config.json"', entrypoint)
@@ -107,6 +120,9 @@ class PublicMetadataTests(unittest.TestCase):
         for variable in UNRAID_OVERRIDES.values():
             with self.subTest(variable=variable):
                 self.assertIn(variable, entrypoint)
+        self.assertIn("FOLDERFRAME_THUMBNAILS", entrypoint)
+        self.assertIn("thumbnail_worker.py", entrypoint)
+        self.assertIn("vips-tools vips-heif", dockerfile)
 
 
 if __name__ == "__main__":

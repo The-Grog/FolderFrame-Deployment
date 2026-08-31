@@ -4,6 +4,7 @@
 !/Dockerfile
 !/Caddyfile
 !/docker-entrypoint.sh
+!/thumbnail_worker.py
 !/README.md
 !/LICENSE
 !/.github/
@@ -28,4 +29,5 @@
 !/compose.yaml
 !/.env.example
 !/scripts/test_public_metadata.py
+!/scripts/test_thumbnail_worker.py
 !/icon.png

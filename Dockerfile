@@ -8,10 +8,12 @@ COPY upstream/docs/images/folderframe-logo.png upstream/docs/images/folderframe-
 COPY upstream/LICENSE /usr/share/licenses/folderframe/LICENSE
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY docker-entrypoint.sh /usr/bin/folderframe-entrypoint
+COPY thumbnail_worker.py /usr/share/folderframe/thumbnail_worker.py
 
-RUN apk add --no-cache jq \
+RUN apk add --no-cache jq python3 vips-tools vips-heif \
     && mkdir -p /media /config /run/folderframe \
     && chmod 0755 /usr/bin/folderframe-entrypoint \
+    && chmod 0755 /usr/share/folderframe/thumbnail_worker.py \
     && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 VOLUME ["/config"]

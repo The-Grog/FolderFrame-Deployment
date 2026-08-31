@@ -2,6 +2,7 @@
 !Dockerfile
 !Caddyfile
 !docker-entrypoint.sh
+!thumbnail_worker.py
 !upstream/
 !upstream/docs/
 !upstream/docs/images/

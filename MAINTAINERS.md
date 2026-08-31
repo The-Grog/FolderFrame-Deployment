@@ -8,6 +8,7 @@ This document is for maintainers of the canonical FolderFrame deployment reposit
 2. Publish a stable GitHub release with a Docker-compatible tag such as `v0.7.0`.
 3. Run **Publish release image** manually for an immediate build, or wait for the daily check.
 4. Confirm resolver tests, image smoke tests, and GHCR publication succeed.
+   The smoke test must generate and serve a WebP from a read-only media mount.
 5. Confirm the version tag and `stable` resolve to the expected image digest.
 6. Update release notes and user-facing documentation when configuration changes.
 
@@ -30,6 +31,9 @@ python -m unittest discover -s scripts -p 'test_*.py'
 ```
 
 For a local image build, create a clean `upstream` checkout at an existing published release tag, then run `docker build --pull -t folderframe:local .`.
+Mount separate temporary `/media` and `/config` directories and confirm the
+worker creates `/config/thumbnails/<relative-media-path>.webp` without changing
+the source file.
 
 ## Community Apps
 

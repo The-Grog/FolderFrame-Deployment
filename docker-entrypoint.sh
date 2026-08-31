@@ -33,6 +33,7 @@ shuffle=${FOLDERFRAME_SHUFFLE:-}
 gallery_refresh_interval=${FOLDERFRAME_GALLERY_REFRESH_INTERVAL:-}
 embed_refresh_interval=${FOLDERFRAME_EMBED_REFRESH_INTERVAL:-}
 remember_preferences=${FOLDERFRAME_REMEMBER_PREFERENCES:-}
+thumbnail_generation=${FOLDERFRAME_THUMBNAILS:-true}
 
 validate_choice() {
     setting_name=$1
@@ -58,6 +59,24 @@ validate_choice FOLDERFRAME_IMAGE_MODE "$image_mode" fit original
 validate_choice FOLDERFRAME_AUTOPLAY "$autoplay" true false
 validate_choice FOLDERFRAME_SHUFFLE "$shuffle" true false
 validate_choice FOLDERFRAME_REMEMBER_PREFERENCES "$remember_preferences" true false
+validate_choice FOLDERFRAME_THUMBNAILS "$thumbnail_generation" true false
+
+validate_integer_range() {
+    setting_name=$1
+    setting_value=$2
+    minimum=$3
+    maximum=$4
+    case "$setting_value" in
+        *[!0-9]*|'')
+            echo "Invalid $setting_name value: $setting_value" >&2
+            exit 1
+            ;;
+    esac
+    if [ "$setting_value" -lt "$minimum" ] || [ "$setting_value" -gt "$maximum" ]; then
+        echo "$setting_name must be between $minimum and $maximum" >&2
+        exit 1
+    fi
+}
 
 for interval_setting in gallery embed; do
     if [ "$interval_setting" = gallery ]; then
@@ -81,6 +100,14 @@ for interval_setting in gallery embed; do
     fi
 done
 
+if [ "$thumbnail_generation" = true ]; then
+    validate_integer_range FOLDERFRAME_THUMBNAIL_INTERVAL "${FOLDERFRAME_THUMBNAIL_INTERVAL:-3600}" 60 86400
+    validate_integer_range FOLDERFRAME_THUMBNAIL_SIZE "${FOLDERFRAME_THUMBNAIL_SIZE:-480}" 64 2048
+    validate_integer_range FOLDERFRAME_THUMBNAIL_QUALITY "${FOLDERFRAME_THUMBNAIL_QUALITY:-80}" 1 100
+    validate_integer_range FOLDERFRAME_THUMBNAIL_DELAY_MS "${FOLDERFRAME_THUMBNAIL_DELAY_MS:-50}" 0 10000
+    validate_integer_range FOLDERFRAME_THUMBNAIL_PRUNE_GRACE "${FOLDERFRAME_THUMBNAIL_PRUNE_GRACE:-86400}" 0 2592000
+fi
+
 temp_config="$runtime_config.tmp"
 jq \
     --arg source_label "$source_label" \
@@ -93,6 +120,7 @@ jq \
     --arg gallery_refresh_interval "$gallery_refresh_interval" \
     --arg embed_refresh_interval "$embed_refresh_interval" \
     --arg remember_preferences "$remember_preferences" \
+    --arg thumbnail_generation "$thumbnail_generation" \
     '
     if $source_label != "" then
         if (.sources | type) == "array" and (.sources | length) > 0
@@ -109,9 +137,25 @@ jq \
     | if $gallery_refresh_interval != "" then .index.refreshInterval = ($gallery_refresh_interval | tonumber) else . end
     | if $embed_refresh_interval != "" then .embed.refreshInterval = ($embed_refresh_interval | tonumber) else . end
     | if $remember_preferences != "" then .defaults.rememberPreferences = ($remember_preferences == "true") else . end
+    | if $thumbnail_generation == "true" then
+        if (.sources | type) == "array" and (.sources | length) > 0
+        then .sources |= map(
+            if ((.path | type) == "string" and (.path | startswith("photos/")))
+            then .thumbnailPath = ("thumbnails/" + (.path | ltrimstr("photos/")))
+            else .
+            end
+        )
+        else error("FOLDERFRAME_THUMBNAILS requires at least one configured source")
+        end
+      else . end
     ' "$persistent_config" > "$temp_config"
 
 chmod 0644 "$persistent_config" "$temp_config"
 mv "$temp_config" "$runtime_config"
+
+if [ "$thumbnail_generation" = true ]; then
+    mkdir -p "$config_dir/thumbnails"
+    python3 /usr/share/folderframe/thumbnail_worker.py &
+fi
 
 exec "$@"

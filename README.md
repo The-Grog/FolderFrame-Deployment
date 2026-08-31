@@ -20,6 +20,13 @@ docker run -d \
 
 Open `http://SERVER-IP:8088/`. Change the host port if 8088 is already in use.
 
+Thumbnail generation is enabled by default. Persistent 480px WebP previews are
+written to the mounted configuration directory under `thumbnails/`; originals
+remain read-only. Add `-e FOLDERFRAME_THUMBNAILS=false` to disable generation.
+Optional tuning variables are `FOLDERFRAME_THUMBNAIL_INTERVAL` (default 3600
+seconds), `FOLDERFRAME_THUMBNAIL_SIZE` (480), and
+`FOLDERFRAME_THUMBNAIL_QUALITY` (80).
+
 ## Quick start with Docker Compose
 
 Copy `.env.example` to `.env`, set `MEDIA_PATH` to an absolute existing directory, and optionally set `CONFIG_PATH` or common FolderFrame overrides. Then run:
@@ -29,6 +36,9 @@ docker compose up -d
 ```
 
 The default `CONFIG_PATH` is `./config`. The container creates `folderframe.config.json` there on first start.
+Compose enables persistent thumbnail generation by default. Set
+`FOLDERFRAME_THUMBNAILS=false` in `.env` to disable it; interval, size, and
+quality examples are included in `.env.example`.
 
 ## Install from Unraid Community Apps
 
@@ -51,10 +61,38 @@ See [Unraid installation](UNRAID.md) for field details, updates, and troubleshoo
 | HTTP port | `8080/tcp` | Map any unused host port to this container port. |
 | Media path | `/media` | Bind-mount a dedicated host media directory read-only. |
 | Configuration path | `/config` | Bind-mount a persistent directory read/write. The default JSON file is created on first start. |
+| Thumbnail cache | `/config/thumbnails` | Generated WebP previews, created automatically inside the persistent configuration mount. |
 
-FolderFrame requires no database, privileged mode, host networking, PUID, or PGID. The appdata/configuration directory contains only administrator-managed configuration.
+FolderFrame requires no database, privileged mode, host networking, PUID, or
+PGID. The appdata/configuration directory contains administrator-managed
+configuration and, by default, generated thumbnail cache files.
 
 Common settings can be supplied with the environment variables documented in [Unraid installation](UNRAID.md). Blank variables defer to `/config/folderframe.config.json`; explicit variables override the corresponding JSON values without rewriting that file.
+
+## Automatic thumbnails
+
+The container scans `/media` in the background and generates missing or
+changed grid previews sequentially. FolderFrame remains usable during the
+initial scan: missing previews fall back to original media until their WebP is
+ready. Current previews are skipped on later scans.
+
+- `FOLDERFRAME_THUMBNAILS`: `true` by default; set `false` to stop
+  generation and omit the automatic `thumbnailPath` runtime setting.
+- `FOLDERFRAME_THUMBNAIL_INTERVAL`: seconds between scans, default `3600`
+  (accepted range `60`–`86400`).
+- `FOLDERFRAME_THUMBNAIL_SIZE`: maximum edge, default `480` pixels
+  (accepted range `64`–`2048`).
+- `FOLDERFRAME_THUMBNAIL_QUALITY`: WebP quality, default `80`
+  (accepted range `1`–`100`).
+- `FOLDERFRAME_THUMBNAIL_DELAY_MS`: pause after each generated preview,
+  default `50` ms.
+- `FOLDERFRAME_THUMBNAIL_PRUNE_GRACE`: minimum age before removing an
+  orphaned preview, default `86400` seconds.
+
+JPEG, PNG, WebP, GIF, HEIC, and HEIF inputs are supported through libvips and
+libheif. Unsupported or damaged files are logged and FolderFrame falls back to
+their originals. Orphan cleanup runs only after a complete media scan; a failed
+or interrupted mount scan never clears the cache.
 
 ## Image tags
 

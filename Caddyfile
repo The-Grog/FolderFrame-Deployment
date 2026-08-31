@@ -21,6 +21,14 @@
 		}
 	}
 
+	# Generated previews are persistent appdata, not original media.
+	redir /thumbnails /thumbnails/ 308
+	handle_path /thumbnails/* {
+		root * /config/thumbnails
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
 	handle {
 		root * /srv/app
 		header Cache-Control "no-cache"
