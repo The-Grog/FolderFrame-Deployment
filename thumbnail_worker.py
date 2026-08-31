@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Maintain FolderFrame's optional persistent thumbnail tree."""
+"""Schedule FolderFrame's persistent thumbnails and media manifest."""
 
 from __future__ import annotations
 
+import json
 import os
 import signal
 import subprocess
@@ -10,19 +11,20 @@ import sys
 import time
 from pathlib import Path
 
-
-SUPPORTED = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"}
 STOP = False
 
-
 def log(message: str) -> None:
-    print(f"FolderFrame thumbnails: {message}", flush=True)
-
+    print(f"FolderFrame media worker: {message}", flush=True)
 
 def stop_worker(_signum: int, _frame: object) -> None:
     global STOP
     STOP = True
 
+def enabled_setting(name: str, default: bool) -> bool:
+    value = os.environ.get(name, str(default).lower())
+    if value not in {"true", "false"}:
+        raise SystemExit(f"{name} must be true or false")
+    return value == "true"
 
 def integer_setting(name: str, default: int, minimum: int, maximum: int) -> int:
     raw = os.environ.get(name, str(default))
@@ -34,138 +36,84 @@ def integer_setting(name: str, default: int, minimum: int, maximum: int) -> int:
         raise SystemExit(f"{name} must be between {minimum} and {maximum}")
     return value
 
-
-def generate_thumbnail(source: Path, target: Path, size: int, quality: int) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp.webp")
+def manifest_status(path: Path) -> str:
+    if not path.is_file():
+        return "missing"
     try:
-        subprocess.run(
-            [
-                "vipsthumbnail",
-                str(source),
-                "--size",
-                f"{size}x{size}",
-                "--rotate",
-                "-o",
-                f"{temporary}[Q={quality},strip]",
-            ],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=180,
-        )
-        os.replace(temporary, target)
-    finally:
-        temporary.unlink(missing_ok=True)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return "invalid"
+    return "valid" if isinstance(payload, dict) and payload.get("version") == 1 else "invalid"
 
+def helper_command(helper: Path, media_root: Path, thumbnail_root: Path,
+        manifest_path: Path, thumbnails: bool, manifest: bool,
+        size: int, quality: int) -> list[str]:
+    command = [sys.executable, str(helper), str(media_root)]
+    if thumbnails:
+        command.extend([str(thumbnail_root), "--size", str(size), "--quality", str(quality)])
+    if manifest:
+        command.extend(["--manifest", str(manifest_path)])
+        if not thumbnails:
+            command.append("--manifest-only")
+    return command
 
-def scan_once(
-    media_root: Path,
-    thumbnail_root: Path,
-    size: int,
-    quality: int,
-    delay_ms: int,
-    prune_grace: int,
-) -> tuple[int, int, int, int]:
-    created = current = failed = removed = 0
-    expected: set[Path] = set()
-    walk_failed = False
-
-    def walk_error(error: OSError) -> None:
-        nonlocal walk_failed
-        walk_failed = True
-        log(f"could not scan {error.filename or 'a media directory'}: {error}")
-
-    for root, directories, files in os.walk(media_root, topdown=True, onerror=walk_error, followlinks=False):
-        if STOP:
-            break
-        root_path = Path(root)
-        directories[:] = sorted(
-            name for name in directories
-            if not name.startswith(".") and not (root_path / name).is_symlink()
-        )
-        for name in sorted(files):
-            if STOP:
-                break
-            source = root_path / name
-            if name.startswith(".") or source.is_symlink() or source.suffix.lower() not in SUPPORTED:
-                continue
-            relative = source.relative_to(media_root)
-            target = thumbnail_root / (str(relative) + ".webp")
-            expected.add(target)
-            try:
-                if target.is_file() and target.stat().st_mtime_ns >= source.stat().st_mtime_ns:
-                    current += 1
-                    continue
-                generate_thumbnail(source, target, size, quality)
-                created += 1
-            except (OSError, subprocess.SubprocessError) as error:
-                failed += 1
-                detail = getattr(error, "stderr", None) or str(error)
-                log(f"skipped {relative}: {detail.strip()}")
-            if delay_ms and not STOP:
-                time.sleep(delay_ms / 1000)
-
-    # Never remove cached previews after an interrupted or incomplete source scan.
-    if not STOP and not walk_failed:
-        cutoff = time.time() - prune_grace
-        for target in thumbnail_root.rglob("*.webp"):
-            if target in expected or target.is_symlink():
-                continue
-            try:
-                if target.stat().st_mtime <= cutoff:
-                    target.unlink()
-                    removed += 1
-            except OSError as error:
-                failed += 1
-                log(f"could not remove stale preview {target}: {error}")
-        for directory in sorted(
-            (path for path in thumbnail_root.rglob("*") if path.is_dir()),
-            key=lambda path: len(path.parts),
-            reverse=True,
-        ):
-            try:
-                directory.rmdir()
-            except OSError:
-                pass
-    return created, current, failed, removed
-
+def run_once(command: list[str], manifest_path: Path | None) -> bool:
+    if manifest_path is not None:
+        status = manifest_status(manifest_path)
+        if status == "missing":
+            log("persistent manifest is missing; helper will rebuild the full index")
+        elif status == "invalid":
+            log("persistent manifest is invalid; helper will rebuild the full index")
+    try:
+        subprocess.run(command, check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        log(f"scan failed; gallery remains available: {error}")
+        return False
+    log("scan complete")
+    return True
 
 def main() -> int:
     signal.signal(signal.SIGTERM, stop_worker)
     signal.signal(signal.SIGINT, stop_worker)
+    thumbnails = enabled_setting("FOLDERFRAME_THUMBNAILS", True)
+    manifest = enabled_setting("FOLDERFRAME_MANIFEST", True)
+    if not thumbnails and not manifest:
+        log("thumbnails and manifest are disabled")
+        return 0
     media_root = Path(os.environ.get("FOLDERFRAME_MEDIA_PATH", "/media")).resolve()
     thumbnail_root = Path(os.environ.get("FOLDERFRAME_THUMBNAIL_PATH", "/config/thumbnails")).resolve()
+    manifest_path = Path(os.environ.get(
+        "FOLDERFRAME_MANIFEST_PATH", "/config/folderframe-data/library.json"
+    )).resolve()
+    helper = Path(os.environ.get(
+        "FOLDERFRAME_HELPER_PATH", "/usr/share/folderframe/generate_thumbnails.py"
+    )).resolve()
     interval = integer_setting("FOLDERFRAME_THUMBNAIL_INTERVAL", 3600, 60, 86400)
-    size = integer_setting("FOLDERFRAME_THUMBNAIL_SIZE", 480, 64, 2048)
+    size = integer_setting("FOLDERFRAME_THUMBNAIL_SIZE", 480, 64, 4096)
     quality = integer_setting("FOLDERFRAME_THUMBNAIL_QUALITY", 80, 1, 100)
-    delay_ms = integer_setting("FOLDERFRAME_THUMBNAIL_DELAY_MS", 50, 0, 10000)
-    prune_grace = integer_setting("FOLDERFRAME_THUMBNAIL_PRUNE_GRACE", 86400, 0, 2592000)
     if not media_root.is_dir():
         log(f"media directory is unavailable: {media_root}")
         return 1
-    thumbnail_root.mkdir(parents=True, exist_ok=True)
-    log(
-        f"enabled; output={thumbnail_root}, interval={interval}s, "
-        f"size={size}px, quality={quality}"
+    if not helper.is_file():
+        log(f"helper is unavailable: {helper}; gallery remains available")
+        return 0
+    if thumbnails:
+        thumbnail_root.mkdir(parents=True, exist_ok=True)
+    if manifest:
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    command = helper_command(helper, media_root, thumbnail_root, manifest_path,
+        thumbnails, manifest, size, quality)
+    mode = "thumbnails+manifest" if thumbnails and manifest else (
+        "thumbnails-only" if thumbnails else "manifest-only"
     )
+    log(f"enabled; mode={mode}, interval={interval}s")
     while not STOP:
-        started = time.monotonic()
-        created, current, failed, removed = scan_once(
-            media_root, thumbnail_root, size, quality, delay_ms, prune_grace
-        )
-        elapsed = time.monotonic() - started
-        log(
-            f"scan complete in {elapsed:.1f}s; generated={created}, "
-            f"current={current}, failed={failed}, removed={removed}"
-        )
+        run_once(command, manifest_path if manifest else None)
         deadline = time.monotonic() + interval
         while not STOP and time.monotonic() < deadline:
             time.sleep(min(1, max(0, deadline - time.monotonic())))
     log("stopped")
     return 0
 
-
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

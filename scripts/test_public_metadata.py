@@ -37,6 +37,7 @@ UNRAID_OVERRIDES = {
 }
 THUMBNAIL_OVERRIDES = {
     "Generate Thumbnails": ("FOLDERFRAME_THUMBNAILS", "true"),
+    "Persistent Media Manifest": ("FOLDERFRAME_MANIFEST", "true"),
     "Thumbnail Scan Interval": ("FOLDERFRAME_THUMBNAIL_INTERVAL", "3600"),
 }
 
@@ -100,6 +101,7 @@ class PublicMetadataTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(f"{variable}:", text)
         self.assertIn('FOLDERFRAME_THUMBNAILS: "${FOLDERFRAME_THUMBNAILS:-true}"', text)
+        self.assertIn('FOLDERFRAME_MANIFEST: "${FOLDERFRAME_MANIFEST:-true}"', text)
         self.assertIn('FOLDERFRAME_THUMBNAIL_INTERVAL: "${FOLDERFRAME_THUMBNAIL_INTERVAL:-3600}"', text)
         self.assertNotIn("privileged:", text)
 
@@ -111,7 +113,11 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn('ENTRYPOINT ["/usr/bin/folderframe-entrypoint"]', dockerfile)
         self.assertIn("handle /folderframe.config.json", caddyfile)
         self.assertIn("handle_path /thumbnails/*", caddyfile)
-        self.assertIn("root * /config/thumbnails", caddyfile)
+        self.assertIn("FOLDERFRAME_THUMBNAIL_PATH:/config/thumbnails", caddyfile)
+        self.assertIn("handle /folderframe-data/library.json", caddyfile)
+        self.assertIn("rewrite * /library.json", caddyfile)
+        self.assertIn("handle_path /folderframe-data/library.d/*", caddyfile)
+        self.assertNotIn("handle_path /config/*", caddyfile)
         self.assertIn("root * /run/folderframe", caddyfile)
         self.assertIn("config_dir=/config", entrypoint)
         self.assertIn('persistent_config="$config_dir/folderframe.config.json"', entrypoint)
@@ -121,8 +127,13 @@ class PublicMetadataTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(variable, entrypoint)
         self.assertIn("FOLDERFRAME_THUMBNAILS", entrypoint)
+        self.assertIn("FOLDERFRAME_MANIFEST", entrypoint)
+        self.assertIn('manifestPath = "folderframe-data/library.json"', entrypoint)
+        self.assertIn("del(.thumbnailPath)", entrypoint)
+        self.assertIn("del(.manifestPath)", entrypoint)
         self.assertIn("thumbnail_worker.py", entrypoint)
-        self.assertIn("vips-tools vips-heif", dockerfile)
+        self.assertIn("COPY upstream/generate_thumbnails.py", dockerfile)
+        self.assertIn("pillow-heif==1.5.0", dockerfile)
 
 
 if __name__ == "__main__":

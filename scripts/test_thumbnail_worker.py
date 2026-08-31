@@ -1,101 +1,77 @@
+import contextlib
 import importlib.util
-import os
+import io
+import json
 import pathlib
+import subprocess
 import tempfile
-import time
 import unittest
 from unittest import mock
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location(
-    "thumbnail_worker", ROOT / "thumbnail_worker.py"
-)
+SPEC = importlib.util.spec_from_file_location("thumbnail_worker", ROOT / "thumbnail_worker.py")
 WORKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WORKER)
 
+class MediaWorkerTests(unittest.TestCase):
+    def command(self, thumbnails, manifest):
+        return WORKER.helper_command(
+            pathlib.Path("/helper.py"), pathlib.Path("/media"),
+            pathlib.Path("/config/thumbnails"),
+            pathlib.Path("/config/folderframe-data/library.json"),
+            thumbnails, manifest, 480, 80,
+        )
 
-class ThumbnailWorkerTests(unittest.TestCase):
-    def setUp(self):
-        WORKER.STOP = False
+    def test_default_combined_command(self):
+        self.assertEqual(self.command(True, True), [
+            WORKER.sys.executable, str(pathlib.Path("/helper.py")), str(pathlib.Path("/media")), str(pathlib.Path("/config/thumbnails")),
+            "--size", "480", "--quality", "80", "--manifest",
+            str(pathlib.Path("/config/folderframe-data/library.json")),
+        ])
 
-    def test_generates_nested_preview_and_skips_current_output(self):
+    def test_thumbnail_only_command(self):
+        command = self.command(True, False)
+        self.assertIn(str(pathlib.Path("/config/thumbnails")), command)
+        self.assertNotIn("--manifest", command)
+        self.assertNotIn("--manifest-only", command)
+
+    def test_manifest_only_command(self):
+        self.assertEqual(self.command(False, True), [
+            WORKER.sys.executable, str(pathlib.Path("/helper.py")), str(pathlib.Path("/media")), "--manifest",
+            str(pathlib.Path("/config/folderframe-data/library.json")), "--manifest-only",
+        ])
+
+    def test_both_disabled_settings_are_supported(self):
+        with mock.patch.dict(WORKER.os.environ, {
+            "FOLDERFRAME_THUMBNAILS": "false",
+            "FOLDERFRAME_MANIFEST": "false",
+        }, clear=True), mock.patch.object(WORKER.signal, "signal"):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(WORKER.main(), 0)
+        self.assertIn("thumbnails and manifest are disabled", output.getvalue())
+
+    def test_missing_and_invalid_manifest_are_reported(self):
         with tempfile.TemporaryDirectory() as directory:
-            base = pathlib.Path(directory)
-            media = base / "media"
-            output = base / "output"
-            source = media / "year" / "photo.jpg"
-            source.parent.mkdir(parents=True)
-            source.write_bytes(b"image")
+            path = pathlib.Path(directory) / "library.json"
+            for content, expected in [(None, "missing"), ("not json", "invalid")]:
+                if content is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_text(content, encoding="utf-8")
+                output = io.StringIO()
+                with mock.patch.object(WORKER.subprocess, "run"), contextlib.redirect_stdout(output):
+                    self.assertTrue(WORKER.run_once(["helper"], path))
+                self.assertIn(expected, output.getvalue())
+            path.write_text(json.dumps({"version": 1}), encoding="utf-8")
+            self.assertEqual(WORKER.manifest_status(path), "valid")
 
-            def fake_generate(_source, target, _size, _quality):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(b"webp")
-
-            with mock.patch.object(WORKER, "generate_thumbnail", side_effect=fake_generate):
-                result = WORKER.scan_once(media, output, 480, 80, 0, 86400)
-                self.assertEqual(result, (1, 0, 0, 0))
-                target = output / "year" / "photo.jpg.webp"
-                self.assertEqual(target.read_bytes(), b"webp")
-                future = time.time() + 2
-                os.utime(target, (future, future))
-                result = WORKER.scan_once(media, output, 480, 80, 0, 86400)
-                self.assertEqual(result, (0, 1, 0, 0))
-
-    def test_prunes_only_old_orphans_after_complete_scan(self):
-        with tempfile.TemporaryDirectory() as directory:
-            base = pathlib.Path(directory)
-            media = base / "media"
-            output = base / "output"
-            media.mkdir()
-            output.mkdir()
-            old = output / "removed.jpg.webp"
-            fresh = output / "recent.jpg.webp"
-            old.write_bytes(b"old")
-            fresh.write_bytes(b"fresh")
-            past = time.time() - 1000
-            os.utime(old, (past, past))
-            result = WORKER.scan_once(media, output, 480, 80, 0, 500)
-            self.assertEqual(result, (0, 0, 0, 1))
-            self.assertFalse(old.exists())
-            self.assertTrue(fresh.exists())
-
-    def test_generation_failure_keeps_original_and_scan_continues(self):
-        with tempfile.TemporaryDirectory() as directory:
-            base = pathlib.Path(directory)
-            media = base / "media"
-            output = base / "output"
-            media.mkdir()
-            (media / "bad.heic").write_bytes(b"unsupported")
-            with mock.patch.object(
-                WORKER, "generate_thumbnail", side_effect=OSError("decode failed")
-            ):
-                result = WORKER.scan_once(media, output, 480, 80, 0, 86400)
-            self.assertEqual(result, (0, 0, 1, 0))
-            self.assertTrue((media / "bad.heic").exists())
-            self.assertFalse((output / "bad.heic.webp").exists())
-
-    def test_incomplete_media_scan_never_prunes_cached_previews(self):
-        with tempfile.TemporaryDirectory() as directory:
-            base = pathlib.Path(directory)
-            media = base / "media"
-            output = base / "output"
-            media.mkdir()
-            output.mkdir()
-            cached = output / "keep.jpg.webp"
-            cached.write_bytes(b"keep")
-            past = time.time() - 1000
-            os.utime(cached, (past, past))
-
-            def failed_walk(_root, **kwargs):
-                kwargs["onerror"](OSError("mount unavailable"))
-                return []
-
-            with mock.patch.object(WORKER.os, "walk", side_effect=failed_walk):
-                result = WORKER.scan_once(media, output, 480, 80, 0, 0)
-            self.assertEqual(result, (0, 0, 0, 0))
-            self.assertTrue(cached.exists())
-
+    def test_helper_failure_is_nonfatal(self):
+        output = io.StringIO()
+        error = subprocess.CalledProcessError(1, ["helper"])
+        with mock.patch.object(WORKER.subprocess, "run", side_effect=error), contextlib.redirect_stdout(output):
+            self.assertFalse(WORKER.run_once(["helper"], None))
+        self.assertIn("gallery remains available", output.getvalue())
 
 if __name__ == "__main__":
     unittest.main()

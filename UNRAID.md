@@ -9,12 +9,11 @@ FolderFrame is available in Unraid Community Apps and uses the tested `stable` i
 3. Choose an existing dedicated **Media Folder** containing only media intended for this gallery.
 4. Keep the default **Appdata Configuration** path or choose another persistent directory.
 5. Choose an unused **Web Port**.
-6. Keep **Generate Thumbnails** set to `true` for faster large galleries.
+6. Keep **Generate Thumbnails** and **Persistent Media Manifest** set to `true` for faster large galleries.
 7. Optionally set any other FolderFrame defaults. Leave an override blank to use `folderframe.config.json`.
 8. Click **Apply**, then open the FolderFrame WebUI.
 
-The media directory is mounted at `/media` read-only. Configuration and
-generated thumbnails are stored separately under `/config`.
+The media directory is mounted at `/media` read-only. Configuration, generated thumbnails, and the persistent manifest are stored separately under `/config`.
 
 ## Persistent configuration
 
@@ -23,6 +22,8 @@ On first start, the container creates:
 ```text
 /mnt/user/appdata/folderframe/folderframe.config.json
 /mnt/user/appdata/folderframe/thumbnails/
+/mnt/user/appdata/folderframe/folderframe-data/library.json
+/mnt/user/appdata/folderframe/folderframe-data/library.d/
 ```
 
 Edit that file for the complete FolderFrame configuration. It remains outside the image and survives container updates. The file is served to browsers, so do not put passwords, tokens, private filesystem paths, or other secrets in it.
@@ -42,29 +43,37 @@ The Unraid fields below provide optional overrides for common settings:
 | Embed Refresh Interval | `FOLDERFRAME_EMBED_REFRESH_INTERVAL` | `embed.refreshInterval` | Integer seconds from `1` to `86400` |
 | Remember Browser Preferences | `FOLDERFRAME_REMEMBER_PREFERENCES` | `defaults.rememberPreferences` | `true`, `false` |
 | Generate Thumbnails | `FOLDERFRAME_THUMBNAILS` | `sources[0].thumbnailPath` in the runtime copy | `true`, `false` |
-| Thumbnail Scan Interval | `FOLDERFRAME_THUMBNAIL_INTERVAL` | Background worker | Integer seconds from `60` to `86400` |
+| Persistent Media Manifest | `FOLDERFRAME_MANIFEST` | `sources[0].manifestPath` in the runtime copy | `true`, `false` |
+| Thumbnail Scan Interval | `FOLDERFRAME_THUMBNAIL_INTERVAL` | Shared background worker | Integer seconds from `60` to `86400` |
 
 Blank override fields defer to the persistent JSON file. Explicit overrides are applied to a generated runtime copy; the persistent JSON file is never rewritten.
 
-## Persistent thumbnails
+## Persistent thumbnails and manifest
 
-The CA template enables background thumbnail generation by default. One file is
-processed at a time, with a short pause between generated previews, so an
-initial scan does not aggressively saturate an HDD array. FolderFrame can be
-used while generation continues and automatically falls back to originals for
-previews that are not ready.
+The CA template enables both by default. They share one scan interval and are
+independently configurable:
 
-Generated WebP files are stored below
-`/mnt/user/appdata/folderframe/thumbnails/` and survive image updates and
-container recreation. The hourly scan skips current previews and refreshes only
-added or changed media. Previews whose originals were removed are deleted only
-after a successful complete scan and a 24-hour grace period. A missing,
-interrupted, or unreadable media mount never causes cache pruning.
+| Thumbnails | Manifest | Worker behavior |
+| --- | --- | --- |
+| `true` | `true` | Generate previews, then update the manifest in one run. |
+| `true` | `false` | Generate previews only. |
+| `false` | `true` | Update the manifest with `--manifest-only`. |
+| `false` | `false` | Do not start the background worker. |
 
-Set **Generate Thumbnails** to `false` if the library is small or appdata space
-is constrained. Existing previews remain on disk so re-enabling the feature
-does not start from scratch; they may be removed manually while the container
-is stopped.
+The initial scan of a very large or Immich-backed library can take time. The
+gallery remains available. Later scans reuse unchanged manifest directory
+records; changes appear on the next scan and stale chunks are cleaned up.
+HEIC/HEIF support is included, while corrupt files are logged. Originals remain
+read-only.
+
+Missing or invalid manifests trigger a logged full rebuild. Helper errors are
+retried at the next interval and do not stop Caddy. `scanCache` is separate
+and not required.
+
+To force a rebuild, stop the container, delete only
+`/mnt/user/appdata/folderframe/folderframe-data/library.json` and
+`library.d/`, then restart. Deleting all appdata also deletes custom
+configuration and thumbnails.
 
 FolderFrame resolves startup settings in this order: packaged defaults, persistent JSON, explicit container overrides, saved browser preferences, then URL parameters. If a changed default appears to have no effect, set **Remember Browser Preferences** to `false`, clear that browser's saved FolderFrame preferences, or test with `?remember=0`.
 
@@ -101,10 +110,11 @@ After applying the template:
 1. Open **WebUI** from the container menu.
 2. Confirm `/mnt/user/appdata/folderframe/folderframe.config.json` was created.
 3. Confirm `/mnt/user/appdata/folderframe/thumbnails` begins receiving WebP files.
-4. Confirm nested folders and images appear while generation is still running.
-5. Change one container override, apply the edit, and verify it changes the startup default.
-6. Restart the container and confirm the configuration, thumbnails, and media return.
-7. Edit the container and verify the `/media` mapping still shows **Read Only**.
+4. Confirm `/mnt/user/appdata/folderframe/folderframe-data/library.json` and `library.d/` are created.
+5. Confirm nested folders and images appear while generation is still running.
+6. Change one container override, apply the edit, and verify it changes the startup default.
+7. Restart the container and confirm the configuration, thumbnails, and media return.
+8. Edit the container and verify the `/media` mapping still shows **Read Only**.
 
 ## Updating
 

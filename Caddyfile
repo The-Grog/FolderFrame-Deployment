@@ -24,8 +24,21 @@
 	# Generated previews are persistent appdata, not original media.
 	redir /thumbnails /thumbnails/ 308
 	handle_path /thumbnails/* {
-		root * /config/thumbnails
+		root * {$FOLDERFRAME_THUMBNAIL_PATH:/config/thumbnails}
 		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	# Serve only the manifest index and its generated chunk files from appdata.
+	handle /folderframe-data/library.json {
+		rewrite * /library.json
+		root * {$FOLDERFRAME_MANIFEST_ROOT:/config/folderframe-data}
+		header Cache-Control "no-store"
+		file_server
+	}
+	handle_path /folderframe-data/library.d/* {
+		root * {$FOLDERFRAME_MANIFEST_ROOT:/config/folderframe-data}/library.d
+		header Cache-Control "no-store"
 		file_server
 	}
 

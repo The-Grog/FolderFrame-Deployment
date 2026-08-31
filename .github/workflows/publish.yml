@@ -113,18 +113,23 @@ jobs:
           done
           curl --fail http://127.0.0.1:8088/photos/ -o /tmp/listing.html
           curl --fail http://127.0.0.1:8088/folderframe.config.json -o /tmp/runtime-config.json
-          python3 -c 'import json; c=json.load(open("/tmp/runtime-config.json")); assert c["sources"][0]["label"] == "Gallery"; assert c["sources"][0]["thumbnailPath"] == "thumbnails/"; assert c["defaults"] == c["defaults"] | {"view":"all","sort":"oldest","interval":10,"imageMode":"original","autoplay":True,"shuffle":True,"rememberPreferences":False}; assert c["index"]["refreshInterval"] == 77; assert c["embed"]["refreshInterval"] == 88'
+          python3 -c 'import json; c=json.load(open("/tmp/runtime-config.json")); assert c["sources"][0]["label"] == "Gallery"; assert c["sources"][0]["thumbnailPath"] == "thumbnails/"; assert c["sources"][0]["manifestPath"] == "folderframe-data/library.json"; assert c["defaults"] == c["defaults"] | {"view":"all","sort":"oldest","interval":10,"imageMode":"original","autoplay":True,"shuffle":True,"rememberPreferences":False}; assert c["index"]["refreshInterval"] == 77; assert c["embed"]["refreshInterval"] == 88'
           for attempt in $(seq 1 30); do
-            test -s /tmp/folderframe-config/thumbnails/smoke.png.webp && break
+            test -s /tmp/folderframe-config/thumbnails/smoke.png.webp && test -s /tmp/folderframe-config/folderframe-data/library.json && break
             sleep 1
           done
           test -s /tmp/folderframe-config/thumbnails/smoke.png.webp
+          test -s /tmp/folderframe-config/folderframe-data/library.json
+          python3 -c 'import json; m=json.load(open("/tmp/folderframe-config/folderframe-data/library.json")); assert m["version"] == 1; assert any(f["path"] == "smoke.png" for f in m["root"]["files"])'
           curl --fail http://127.0.0.1:8088/thumbnails/smoke.png.webp -o /tmp/smoke-thumb.webp
+          curl --fail http://127.0.0.1:8088/folderframe-data/library.json -o /tmp/smoke-manifest.json
           test -s /tmp/smoke-thumb.webp
           python3 -c 'import json; c=json.load(open("/tmp/folderframe-config/folderframe.config.json")); assert c["sources"][0]["label"] != "Gallery"; assert c["defaults"]["view"] != "all"'
           docker restart smoke
           curl --retry 10 --retry-all-errors --retry-delay 1 --retry-max-time 30 --fail http://127.0.0.1:8088/folderframe.config.json -o /tmp/restarted-config.json
           cmp /tmp/runtime-config.json /tmp/restarted-config.json
+          test -s /tmp/folderframe-config/folderframe-data/library.json
+          curl --fail http://127.0.0.1:8088/folderframe-data/library.json -o /tmp/restarted-manifest.json
           if docker run --rm -e FOLDERFRAME_STARTING_VIEW=invalid folderframe:ci true; then
             echo "Invalid override unexpectedly succeeded" >&2
             exit 1
@@ -133,7 +138,7 @@ jobs:
             echo "Invalid thumbnail interval unexpectedly succeeded" >&2
             exit 1
           fi
-          for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile; do
+          for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile folderframe-data/secret.txt config/folderframe.config.json; do
             test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/$path")" = 404
           done
       - name: Publish to GHCR

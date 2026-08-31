@@ -34,6 +34,9 @@ gallery_refresh_interval=${FOLDERFRAME_GALLERY_REFRESH_INTERVAL:-}
 embed_refresh_interval=${FOLDERFRAME_EMBED_REFRESH_INTERVAL:-}
 remember_preferences=${FOLDERFRAME_REMEMBER_PREFERENCES:-}
 thumbnail_generation=${FOLDERFRAME_THUMBNAILS:-true}
+manifest_generation=${FOLDERFRAME_MANIFEST:-true}
+thumbnail_path=${FOLDERFRAME_THUMBNAIL_PATH:-/config/thumbnails}
+manifest_path=${FOLDERFRAME_MANIFEST_PATH:-/config/folderframe-data/library.json}
 
 validate_choice() {
     setting_name=$1
@@ -60,6 +63,7 @@ validate_choice FOLDERFRAME_AUTOPLAY "$autoplay" true false
 validate_choice FOLDERFRAME_SHUFFLE "$shuffle" true false
 validate_choice FOLDERFRAME_REMEMBER_PREFERENCES "$remember_preferences" true false
 validate_choice FOLDERFRAME_THUMBNAILS "$thumbnail_generation" true false
+validate_choice FOLDERFRAME_MANIFEST "$manifest_generation" true false
 
 validate_integer_range() {
     setting_name=$1
@@ -100,12 +104,12 @@ for interval_setting in gallery embed; do
     fi
 done
 
-if [ "$thumbnail_generation" = true ]; then
+if [ "$thumbnail_generation" = true ] || [ "$manifest_generation" = true ]; then
     validate_integer_range FOLDERFRAME_THUMBNAIL_INTERVAL "${FOLDERFRAME_THUMBNAIL_INTERVAL:-3600}" 60 86400
-    validate_integer_range FOLDERFRAME_THUMBNAIL_SIZE "${FOLDERFRAME_THUMBNAIL_SIZE:-480}" 64 2048
+fi
+if [ "$thumbnail_generation" = true ]; then
+    validate_integer_range FOLDERFRAME_THUMBNAIL_SIZE "${FOLDERFRAME_THUMBNAIL_SIZE:-480}" 64 4096
     validate_integer_range FOLDERFRAME_THUMBNAIL_QUALITY "${FOLDERFRAME_THUMBNAIL_QUALITY:-80}" 1 100
-    validate_integer_range FOLDERFRAME_THUMBNAIL_DELAY_MS "${FOLDERFRAME_THUMBNAIL_DELAY_MS:-50}" 0 10000
-    validate_integer_range FOLDERFRAME_THUMBNAIL_PRUNE_GRACE "${FOLDERFRAME_THUMBNAIL_PRUNE_GRACE:-86400}" 0 2592000
 fi
 
 temp_config="$runtime_config.tmp"
@@ -121,6 +125,7 @@ jq \
     --arg embed_refresh_interval "$embed_refresh_interval" \
     --arg remember_preferences "$remember_preferences" \
     --arg thumbnail_generation "$thumbnail_generation" \
+    --arg manifest_generation "$manifest_generation" \
     '
     if $source_label != "" then
         if (.sources | type) == "array" and (.sources | length) > 0
@@ -147,14 +152,43 @@ jq \
         )
         else error("FOLDERFRAME_THUMBNAILS requires at least one configured source")
         end
-      else . end
+      else
+        .sources |= map(
+            if ((.path | type) == "string" and (.path | startswith("photos/")))
+            then del(.thumbnailPath)
+            else .
+            end
+        )
+      end
+    | if $manifest_generation == "true" then
+        if (.sources | type) == "array" and (.sources | length) > 0
+        then .sources |= map(
+            if ((.path | type) == "string" and (.path | startswith("photos/")))
+            then .manifestPath = "folderframe-data/library.json"
+            else .
+            end
+        )
+        else error("FOLDERFRAME_MANIFEST requires at least one configured source")
+        end
+      else
+        .sources |= map(
+            if ((.path | type) == "string" and (.path | startswith("photos/")))
+            then del(.manifestPath)
+            else .
+            end
+        )
+      end
     ' "$persistent_config" > "$temp_config"
 
 chmod 0644 "$persistent_config" "$temp_config"
 mv "$temp_config" "$runtime_config"
 
-if [ "$thumbnail_generation" = true ]; then
-    mkdir -p "$config_dir/thumbnails"
+if [ "$thumbnail_generation" = true ] || [ "$manifest_generation" = true ]; then
+    export FOLDERFRAME_THUMBNAIL_PATH="$thumbnail_path"
+    export FOLDERFRAME_MANIFEST_PATH="$manifest_path"
+    export FOLDERFRAME_MANIFEST_ROOT="${manifest_path%/*}"
+    [ "$thumbnail_generation" = false ] || mkdir -p "$thumbnail_path"
+    [ "$manifest_generation" = false ] || mkdir -p "$FOLDERFRAME_MANIFEST_ROOT"
     python3 /usr/share/folderframe/thumbnail_worker.py &
 fi
 
