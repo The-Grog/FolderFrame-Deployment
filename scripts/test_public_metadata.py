@@ -107,6 +107,8 @@ class PublicMetadataTests(unittest.TestCase):
 
     def test_container_serves_generated_config(self):
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+        dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+        publish_workflow = (ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8")
         caddyfile = (ROOT / "Caddyfile").read_text(encoding="utf-8")
         entrypoint = (ROOT / "docker-entrypoint.sh").read_text(encoding="utf-8")
         self.assertIn('VOLUME ["/config"]', dockerfile)
@@ -133,6 +135,9 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn("del(.manifestPath)", entrypoint)
         self.assertIn("thumbnail_worker.py", entrypoint)
         self.assertIn("COPY upstream/generate_thumbnails.py", dockerfile)
+        self.assertIn("upstream/docs/images/folderframe-logo-back.png", dockerfile)
+        self.assertIn("!upstream/docs/images/folderframe-logo-back.png", dockerignore)
+        self.assertIn("docs/images/folderframe-logo-back.png", publish_workflow)
         self.assertIn("pillow-heif==1.5.0", dockerfile)
 
 
