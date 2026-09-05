@@ -69,6 +69,41 @@ configuration and, by default, generated thumbnails and manifest files.
 
 Common settings can be supplied with the environment variables documented in [Unraid installation](UNRAID.md). Blank variables defer to `/config/folderframe.config.json`; explicit variables override the corresponding JSON values without rewriting that file.
 
+### Editing `folderframe.config.json`
+
+The container creates `/config/folderframe.config.json` on first start. Edit the
+copy in the host directory mounted at `/config`—typically
+`/mnt/user/appdata/folderframe/folderframe.config.json` on Unraid—then restart
+the container. The file survives image updates.
+
+```json
+{
+  "sources": [
+    {
+      "id": "photos",
+      "label": "Family Photos",
+      "path": "photos/"
+    }
+  ],
+  "defaults": {
+    "view": "folders",
+    "sort": "filename",
+    "autoplay": false
+  }
+}
+```
+
+Keep `path` set to the browser route `photos/`; the host media path belongs in
+the Docker bind mount or Unraid **Media Folder** field. When thumbnail or
+manifest generation is enabled, the container adds their browser paths to its
+runtime copy automatically. Explicit environment variables override matching
+JSON settings without changing the persistent file.
+
+The configuration is served to browsers, so do not store passwords, tokens,
+host filesystem paths, or other secrets in it. See the app's
+[complete configuration guide](https://github.com/The-Grog/FolderFrame/blob/main/CONFIGURATION.md)
+for sources, profile defaults, URL overrides, and all available settings.
+
 ## Persistent thumbnails and media manifest
 
 One background worker invokes the release-provided `generate_thumbnails.py`
