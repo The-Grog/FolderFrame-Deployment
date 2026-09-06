@@ -20,6 +20,29 @@ docker run -d \
 
 Open `http://SERVER-IP:8088/`. Change the host port if 8088 is already in use.
 
+### Multiple media folders
+
+Mount each additional host directory at a unique child path below `/media`.
+FolderFrame presents those child paths as top-level albums and its thumbnail and
+manifest worker scans them together:
+
+```sh
+docker run -d \
+  --name folderframe \
+  --restart unless-stopped \
+  -p 8088:8080 \
+  --mount type=bind,source=/absolute/path/to/family,target=/media/Family,readonly \
+  --mount type=bind,source=/absolute/path/to/archive,target=/media/Archive,readonly \
+  --mount type=bind,source=/absolute/path/to/folderframe-config,target=/config \
+  ghcr.io/the-grog/folderframe-deployment:stable
+```
+
+Every container destination must be unique and remain under `/media/`, such as
+`/media/Family` or `/media/Archive`. Keep every media mount read-only. Docker
+Compose users can add equivalent entries beneath the service's `volumes` list.
+See [Unraid installation](UNRAID.md#additional-media-folders) for the WebGUI
+workflow.
+
 Thumbnail generation and the persistent media manifest are enabled by default.
 They are stored below `/config` and survive image updates. Originals stay
 read-only. Use `-e FOLDERFRAME_THUMBNAILS=false` or
@@ -58,7 +81,7 @@ See [Unraid installation](UNRAID.md) for field details, updates, and troubleshoo
 | Setting | Container value | Purpose |
 | --- | --- | --- |
 | HTTP port | `8080/tcp` | Map any unused host port to this container port. |
-| Media path | `/media` | Bind-mount a dedicated host media directory read-only. |
+| Media path | `/media` or unique paths below `/media/` | Bind-mount one or more dedicated host media directories read-only. |
 | Configuration path | `/config` | Bind-mount a persistent directory read/write. The default JSON file is created on first start. |
 | Thumbnail cache | `/config/thumbnails` | Generated WebP previews inside the persistent configuration mount. |
 | Media manifest | `/config/folderframe-data/library.json` | Persistent root index; chunks are stored in `library.d/`. |

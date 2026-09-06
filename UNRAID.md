@@ -15,6 +15,30 @@ FolderFrame is available in Unraid Community Apps and uses the tested `stable` i
 
 The media directory is mounted at `/media` read-only. Configuration, generated thumbnails, and the persistent manifest are stored separately under `/config`.
 
+## Additional media folders
+
+FolderFrame can combine multiple host directories into one gallery. Each added
+directory appears as a top-level album and is included in the same thumbnail and
+manifest scan.
+
+1. Open the Unraid **Docker** tab, click the FolderFrame icon, and choose **Edit**.
+2. Click **Add another Path, Port, Variable, Label or Device**.
+3. Set **Config Type** to **Path** and give it a descriptive name, such as
+   `Archive Photos`.
+4. Select the additional host directory in **Host Path**. For an SMB share,
+   mount it on Unraid first and select its Linux path, commonly below
+   `/mnt/remotes/`; Windows UNC paths cannot be used directly by the container.
+5. Set **Container Path** to a unique child of `/media/`, such as
+   `/media/Archive`. Do not reuse `/media` or another mapping's container path.
+6. Set **Access Mode** to **Read Only**.
+7. Click **Add**, then **Apply** to recreate the container with the new mount.
+
+Repeat these steps for as many folders as needed, using a different container
+path each time—for example `/media/Family`, `/media/Archive`, and
+`/media/Scans`. Folder names beneath `/media/` become the album names shown in
+FolderFrame. The existing `photos/` source and generated thumbnail/manifest
+configuration do not need to change.
+
 ## Persistent configuration
 
 On first start, the container creates:
@@ -114,7 +138,8 @@ After applying the template:
 5. Confirm nested folders and images appear while generation is still running.
 6. Change one container override, apply the edit, and verify it changes the startup default.
 7. Restart the container and confirm the configuration, thumbnails, and media return.
-8. Edit the container and verify the `/media` mapping still shows **Read Only**.
+8. Edit the container and verify every `/media` mapping shows **Read Only** and
+   uses a unique container path.
 
 ## Updating
 
