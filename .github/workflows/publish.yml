@@ -5,6 +5,8 @@ on:
     - cron: '23 9 * * *'
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 concurrency:
@@ -21,10 +23,11 @@ jobs:
       - name: Validate Docker Compose example
         run: MEDIA_PATH=/tmp/folderframe-media docker compose config --quiet
   publish:
-    if: github.event_name != 'push'
+    if: github.event_name == 'workflow_dispatch'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: container-publish
     permissions:
       contents: read
       packages: write

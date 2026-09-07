@@ -12,6 +12,9 @@
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/publish.yml
+!/.github/workflows/codeql.yml
+!/.github/CODEOWNERS
+!/.github/dependabot.yml
 !/.github/ISSUE_TEMPLATE/
 /.github/ISSUE_TEMPLATE/*
 !/.github/ISSUE_TEMPLATE/config.yml
