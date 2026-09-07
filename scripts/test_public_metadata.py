@@ -43,6 +43,11 @@ THUMBNAIL_OVERRIDES = {
     "Persistent Media Manifest": ("FOLDERFRAME_MANIFEST", "true"),
     "Thumbnail Scan Interval": ("FOLDERFRAME_THUMBNAIL_INTERVAL", "3600"),
 }
+TRANSCODE_OVERRIDES = {
+    "Video Compatibility Fallback": ("FOLDERFRAME_VIDEO_TRANSCODE", "true"),
+    "Maximum Transcodes": ("FOLDERFRAME_TRANSCODE_JOBS", "2"),
+    "Threads per Transcode": ("FOLDERFRAME_TRANSCODE_THREADS", "2"),
+}
 
 
 class PublicMetadataTests(unittest.TestCase):
@@ -75,7 +80,7 @@ class PublicMetadataTests(unittest.TestCase):
         actual = {
             name: attrs["Target"]
             for name, attrs in configs.items()
-            if attrs["Type"] == "Variable" and name not in THUMBNAIL_OVERRIDES
+            if attrs["Type"] == "Variable" and name not in THUMBNAIL_OVERRIDES and name not in TRANSCODE_OVERRIDES
         }
         self.assertEqual(actual, UNRAID_OVERRIDES)
         for name in UNRAID_OVERRIDES:
@@ -86,6 +91,11 @@ class PublicMetadataTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(configs[name]["Target"], target)
                 self.assertEqual(configs[name]["Default"], default)
+        for name, (target, default) in TRANSCODE_OVERRIDES.items():
+            with self.subTest(name=name):
+                self.assertEqual(configs[name]["Target"], target)
+                self.assertEqual(configs[name]["Default"], default)
+                self.assertEqual(configs[name]["Required"], "true")
 
     def test_community_apps_profile_is_complete(self):
         root = ET.parse(ROOT / "ca_profile.xml").getroot()
@@ -106,6 +116,9 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn('FOLDERFRAME_THUMBNAILS: "${FOLDERFRAME_THUMBNAILS:-true}"', text)
         self.assertIn('FOLDERFRAME_MANIFEST: "${FOLDERFRAME_MANIFEST:-true}"', text)
         self.assertIn('FOLDERFRAME_THUMBNAIL_INTERVAL: "${FOLDERFRAME_THUMBNAIL_INTERVAL:-3600}"', text)
+        for variable, default in TRANSCODE_OVERRIDES.values():
+            with self.subTest(variable=variable):
+                self.assertIn(f'{variable}: "${{{variable}:-{default}}}"', text)
         self.assertNotIn("privileged:", text)
 
     def test_container_serves_generated_config(self):
