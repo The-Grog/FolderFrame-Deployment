@@ -189,7 +189,6 @@ if [ "$thumbnail_generation" = true ] || [ "$manifest_generation" = true ]; then
     export FOLDERFRAME_MANIFEST_ROOT="${manifest_path%/*}"
     [ "$thumbnail_generation" = false ] || mkdir -p "$thumbnail_path"
     [ "$manifest_generation" = false ] || mkdir -p "$FOLDERFRAME_MANIFEST_ROOT"
-    python3 /usr/share/folderframe/thumbnail_worker.py &
 fi
 
-exec "$@"
+exec python3 /usr/share/folderframe/service_runner.py "$@"

@@ -5,6 +5,9 @@
 !/Caddyfile
 !/docker-entrypoint.sh
 !/thumbnail_worker.py
+!/transcode_service.py
+!/service_runner.py
+!/TRANSCODING.md
 !/README.md
 !/LICENSE
 !/.github/
@@ -33,4 +36,5 @@
 !/.env.example
 !/scripts/test_public_metadata.py
 !/scripts/test_thumbnail_worker.py
+!/scripts/test_transcode_service.py
 !/icon.png

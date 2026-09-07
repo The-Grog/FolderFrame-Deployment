@@ -4,6 +4,12 @@
 }
 
 :8080 {
+    handle /folderframe-api/* {
+        reverse_proxy 127.0.0.1:8081 {
+            # Flush fragments immediately and cancel upstream on disconnect.
+            flush_interval 10ms
+        }
+    }
 	# Serve the generated runtime configuration before other app assets.
 	handle /folderframe.config.json {
 		root * /run/folderframe

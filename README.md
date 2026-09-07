@@ -127,6 +127,15 @@ host filesystem paths, or other secrets in it. See the app's
 [complete configuration guide](https://github.com/The-Grog/FolderFrame/blob/main/CONFIGURATION.md)
 for sources, profile defaults, URL overrides, and all available settings.
 
+## Apple video compatibility
+
+The original always plays first. When the browser reports a genuine decode or
+format failure, the optional FFmpeg service streams H.264/AAC directly. Originals
+are untouched, and no converted movies are stored in media or appdata. The
+default limit is two software jobs; hardware acceleration is not required.
+Transcoded playback is sequential without arbitrary seeking. Native-compatible
+media uses no transcoding CPU. See [configuration, security, and limits](TRANSCODING.md).
+
 ## Persistent thumbnails and media manifest
 
 One background worker invokes the release-provided `generate_thumbnails.py`

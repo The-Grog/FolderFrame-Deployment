@@ -2,6 +2,14 @@
 
 FolderFrame is available in Unraid Community Apps and uses the tested `stable` image channel.
 
+The optional video fallback tries native playback first, then streams unsupported
+video through FFmpeg without creating converted files in your media or appdata.
+Software CPU encoding is supported; GPU acceleration is not implemented. It is
+limited to two jobs by default and supports sequential playback without arbitrary
+seeking. In **Add another Path, Port, Variable, Label or Device**, choose **Variable**
+to set `FOLDERFRAME_VIDEO_TRANSCODE=false`, `FOLDERFRAME_TRANSCODE_JOBS=1`, or
+`FOLDERFRAME_TRANSCODE_THREADS=2` as needed. See [transcoding details](TRANSCODING.md).
+
 ## Install from Community Apps
 
 1. Open the **Apps** tab and search for **FolderFrame**.

@@ -15,6 +15,9 @@ PUBLIC_TEXT = [
     ROOT / "Caddyfile",
     ROOT / "docker-entrypoint.sh",
     ROOT / "thumbnail_worker.py",
+    ROOT / "transcode_service.py",
+    ROOT / "service_runner.py",
+    ROOT / "TRANSCODING.md",
 ]
 PRIVATE_MARKERS = (
     "grogpool",
@@ -133,7 +136,8 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn('manifestPath = "folderframe-data/library.json"', entrypoint)
         self.assertIn("del(.thumbnailPath)", entrypoint)
         self.assertIn("del(.manifestPath)", entrypoint)
-        self.assertIn("thumbnail_worker.py", entrypoint)
+        self.assertIn("service_runner.py", entrypoint)
+        self.assertIn("thumbnail_worker.py", (ROOT / "service_runner.py").read_text())
         self.assertIn("COPY upstream/generate_thumbnails.py", dockerfile)
         self.assertIn("upstream/docs/images/folderframe-logo-back.png", dockerfile)
         self.assertIn("!upstream/docs/images/folderframe-logo-back.png", dockerignore)

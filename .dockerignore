@@ -3,6 +3,8 @@
 !Caddyfile
 !docker-entrypoint.sh
 !thumbnail_worker.py
+!transcode_service.py
+!service_runner.py
 !upstream/
 !upstream/docs/
 !upstream/docs/images/
@@ -12,7 +14,10 @@
 !upstream/app.js
 !upstream/settings.js
 !upstream/resilience.js
-!upstream/heic2any.min.js
+!upstream/vendor/
+!upstream/vendor/**
+!upstream/THIRD_PARTY_NOTICES.md
+!upstream/generate_thumbnails.py
 !upstream/folderframe.config.json
 !upstream/LICENSE
 !upstream/docs/images/folderframe-logo.png

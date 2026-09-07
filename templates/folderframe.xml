@@ -14,7 +14,7 @@
   <Support>https://github.com/The-Grog/FolderFrame-Deployment/issues</Support>
   <TemplateURL>https://raw.githubusercontent.com/The-Grog/FolderFrame-Deployment/main/templates/folderframe.xml</TemplateURL>
   <ReadMe>https://github.com/The-Grog/FolderFrame-Deployment/blob/main/UNRAID.md</ReadMe>
-  <License>MIT</License>
+  <License>MIT (FolderFrame); LGPL/GPL third-party components</License>
   <Config Name="Web Port" Target="8080" Default="8088" Mode="tcp" Description="Choose an unused host port for the gallery." Type="Port" Display="always" Required="true" Mask="false">8088</Config>
   <Config Name="Media Folder" Target="/media" Default="" Mode="ro" Description="Select an existing dedicated gallery folder. To add more, use Add another Path with a unique container path below /media/, such as /media/Archive, and keep it read-only. Do not select a whole share or repository." Type="Path" Display="always" Required="true" Mask="false" />
   <Config Name="Appdata Configuration" Target="/config" Default="/mnt/user/appdata/folderframe" Mode="rw" Description="Persistent FolderFrame configuration. The default JSON file is created automatically on first start." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/folderframe</Config>

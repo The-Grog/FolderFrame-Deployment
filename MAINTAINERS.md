@@ -31,6 +31,11 @@ python -m unittest discover -s scripts -p 'test_*.py'
 ```
 
 For a local image build, create a clean `upstream` checkout at an existing published release tag, then run `docker build --pull -t folderframe:local .`.
+This recipe requires the Apple-media core release with `vendor/heic-to-1.5.2/`
+and `THIRD_PARTY_NOTICES.md`; older release inputs intentionally fail the copy
+step. Coordinate the core release before publishing this recipe. Run the Linux
+transcode tests with FFmpeg, and verify streaming through Caddy, client
+disconnect cleanup, and source/license availability. See TRANSCODING.md.
 Mount separate temporary `/media` and `/config` directories and confirm the
 worker creates a WebP, `/config/folderframe-data/library.json`, and chunk
 files without changing media. Test all four toggle modes, rebuild logging, and
