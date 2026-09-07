@@ -75,19 +75,32 @@ def ffmpeg_command(fd, container, threads=2, executable='ffmpeg'):
 
 
 async def terminate(process):
-    if process.returncode is None:
-        try:
-            process.terminate()
-        except ProcessLookupError:
-            pass
+    async def discard_output():
+        # Keep the pipe flowing while stopping the child. Otherwise a paused
+        # StreamReader can keep Process.wait() pending even after SIGKILL.
+        if process.stdout is not None:
+            while await process.stdout.read(65536):
+                pass
+
+    completed = asyncio.gather(process.wait(), discard_output())
     try:
-        await asyncio.wait_for(process.wait(), 2)
-    except asyncio.TimeoutError:
+        if process.returncode is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
         try:
-            process.kill()
-        except ProcessLookupError:
-            pass
-        await process.wait()
+            await asyncio.wait_for(asyncio.shield(completed), 2)
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await asyncio.wait_for(asyncio.shield(completed), 2)
+    finally:
+        if not completed.done():
+            completed.cancel()
+        await asyncio.gather(completed, return_exceptions=True)
 
 
 class TranscodeService:
@@ -201,20 +214,31 @@ class TranscodeService:
         finally:
             if disconnected:
                 disconnected.cancel()
-                await asyncio.gather(disconnected, return_exceptions=True)
-            if process:
-                await terminate(process)
-                self.processes.discard(process)
-            if fd is not None:
-                os.close(fd)
-            if admitted:
-                self.active -= 1
-            writer.close()
             try:
-                await asyncio.wait_for(writer.wait_closed(), 2)
-            except (ConnectionError, asyncio.TimeoutError):
-                pass
-            self.tasks.discard(task)
+                if process:
+                    cleanup = asyncio.create_task(terminate(process))
+                    try:
+                        await asyncio.shield(cleanup)
+                    except asyncio.CancelledError:
+                        # Shutdown may cancel a handler already cleaning up.
+                        # Finish reaping before returning its capacity slot.
+                        await cleanup
+                        raise
+            finally:
+                self.processes.discard(process)
+                if fd is not None:
+                    os.close(fd)
+                if admitted:
+                    self.active -= 1
+                writer.close()
+                try:
+                    if disconnected:
+                        await asyncio.gather(disconnected, return_exceptions=True)
+                    await asyncio.wait_for(writer.wait_closed(), 2)
+                except (ConnectionError, asyncio.TimeoutError):
+                    pass
+                finally:
+                    self.tasks.discard(task)
 
     async def close(self):
         tasks = list(self.tasks)

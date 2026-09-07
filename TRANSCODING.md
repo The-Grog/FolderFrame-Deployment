@@ -67,6 +67,10 @@ leaving the viewer disconnects the request; the service terminates FFmpeg,
 waits up to 2 seconds, then kills and reaps if needed. Container shutdown also
 closes API handlers and stops the thumbnail worker and Caddy.
 
+Cleanup drains and discards buffered stdout in bounded chunks while reaping,
+with a second 2-second deadline after a forced kill. This prevents cancelled
+playback from leaving an occupied slot behind after FFmpeg has exited.
+
 Transcoded output supports sequential playback, not arbitrary seeking/resume.
 Range is ignored with a full 200 response and `Accept-Ranges: none`; the service
 never fabricates byte ranges. Original-video seeking is unchanged. A paused

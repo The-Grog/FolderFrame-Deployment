@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from urllib.parse import quote
@@ -155,6 +156,52 @@ class StreamingTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0.05)
             self.assertEqual(self.service.active, 0)
             self.assertIsNotNone(processes[0].returncode)
+
+    async def test_full_stdout_pipe_cleanup_drains_and_escalates(self):
+        # Force the real failure: a full reader buffer and a child that needs
+        # SIGKILL. Waiting without draining used to hang after that kill.
+        process = await asyncio.create_subprocess_exec(sys.executable, '-c',
+            'import os, signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); '
+            'os.write(1, b"x" * 1048576); time.sleep(60)',
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            limit=65536)
+        try:
+            for _ in range(100):
+                if process.stdout._paused:
+                    break
+                await asyncio.sleep(0.01)
+            self.assertTrue(process.stdout._paused, 'Test did not fill the pipe')
+            await asyncio.wait_for(api.terminate(process), 6)
+            self.assertIsNotNone(process.returncode)
+            self.assertTrue(process.stdout.at_eof())
+        finally:
+            # Also clean up when run against the old, deadlocking implementation.
+            if process.returncode is None:
+                process.kill()
+            while await process.stdout.read(65536):
+                pass
+            await process.wait()
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'FFmpeg required for real streaming test')
+    async def test_repeated_full_hd_disconnects_release_every_slot(self):
+        subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+            '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=24', '-t', '2',
+            '-c:v', 'mpeg4', str(self.original)], check=True)
+        # More cancellations than the available slots; the next request must
+        # still be admitted. No realtime throttling: reproduce buffered output.
+        for _ in range(self.service.limit + 2):
+            reader, writer = await self.connect('/folderframe-api/transcode?path=tiny.mov')
+            header = await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'), 10)
+            self.assertIn(b'200 OK', header)
+            processes = list(self.service.processes)
+            writer.transport.abort()
+            for _ in range(120):
+                if not self.service.active:
+                    break
+                await asyncio.sleep(0.05)
+            self.assertEqual(self.service.active, 0)
+            self.assertFalse(self.service.processes)
+            self.assertTrue(all(p.returncode is not None for p in processes))
 
 
 if __name__ == '__main__':
