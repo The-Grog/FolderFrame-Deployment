@@ -158,6 +158,16 @@ folders appear on the next scan, and stale manifest chunks are removed. A
 missing or invalid manifest causes a logged full rebuild. Helper failures are
 logged but do not stop Caddy.
 
+Thumbnail failures are stored in
+`/config/folderframe-data/thumbnail-failures.json`, keyed by relative path,
+size, and modification time. Unchanged failures are skipped on later scans;
+changed or replaced sources are retried. A few failed previews produce a
+`scan complete with preview warnings` result instead of failing an otherwise
+valid manifest scan. The latest structured result is stored in
+`/config/folderframe-data/worker-status.json` and the worker log summarizes
+media files, generated previews, new preview failures, and unchanged failures
+skipped. Only scanner/helper or manifest failures report `scan failed`.
+
 JPEG, PNG, WebP, GIF, HEIC, and HEIF thumbnails are supported through Pillow
 and pillow-heif. Videos are indexed but do not receive generated thumbnails.
 Original media is never modified.
@@ -174,7 +184,9 @@ all appdata also resets custom configuration and thumbnails; first startup
 recreates defaults and performs a full scan.
 
 Advanced overrides are `FOLDERFRAME_MEDIA_PATH`,
-`FOLDERFRAME_THUMBNAIL_PATH`, and `FOLDERFRAME_MANIFEST_PATH`. Keep the
+`FOLDERFRAME_THUMBNAIL_PATH`, `FOLDERFRAME_MANIFEST_PATH`,
+`FOLDERFRAME_THUMBNAIL_FAILURE_CACHE_PATH`, and
+`FOLDERFRAME_WORKER_STATUS_PATH`. Keep the
 manifest filename `library.json`; public access is deliberately limited to
 `/folderframe-data/library.json`, `/folderframe-data/library.d/*.json`, and
 the thumbnail route.
