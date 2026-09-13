@@ -135,6 +135,7 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn("handle /folderframe-data/library.json", caddyfile)
         self.assertIn("rewrite * /library.json", caddyfile)
         self.assertIn("handle_path /folderframe-data/library.d/*", caddyfile)
+        self.assertIn("handle_path /folderframe-data/exif.d/*", caddyfile)
         self.assertNotIn("handle_path /config/*", caddyfile)
         self.assertIn("root * /run/folderframe", caddyfile)
         self.assertIn("config_dir=/config", entrypoint)

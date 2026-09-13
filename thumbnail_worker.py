@@ -75,6 +75,8 @@ def status_summary(status: dict) -> str:
         f"{status.get('thumbnailsGenerated', 0)} thumbnails generated",
         f"{status.get('previewFailures', 0)} preview failures",
         f"{status.get('unchangedFailuresSkipped', 0)} unchanged failures skipped",
+        f"{status.get('metadataExtracted', 0)} metadata records extracted",
+        f"{status.get('metadataWarnings', 0)} metadata warnings",
     ])
     return f"{prefix} — {' · '.join(parts)}"
 

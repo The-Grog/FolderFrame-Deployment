@@ -56,6 +56,7 @@ On first start, the container creates:
 /mnt/user/appdata/folderframe/thumbnails/
 /mnt/user/appdata/folderframe/folderframe-data/library.json
 /mnt/user/appdata/folderframe/folderframe-data/library.d/
+/mnt/user/appdata/folderframe/folderframe-data/exif.d/
 ```
 
 Edit that file for the complete FolderFrame configuration. It remains outside the image and survives container updates. The file is served to browsers, so do not put passwords, tokens, private filesystem paths, or other secrets in it.
@@ -142,7 +143,8 @@ After applying the template:
 1. Open **WebUI** from the container menu.
 2. Confirm `/mnt/user/appdata/folderframe/folderframe.config.json` was created.
 3. Confirm `/mnt/user/appdata/folderframe/thumbnails` begins receiving WebP files.
-4. Confirm `/mnt/user/appdata/folderframe/folderframe-data/library.json` and `library.d/` are created.
+4. Confirm `/mnt/user/appdata/folderframe/folderframe-data/library.json`,
+   `library.d/`, and (for images with usable EXIF) `exif.d/` are created.
 5. Confirm nested folders and images appear while generation is still running.
 6. Change one container override, apply the edit, and verify it changes the startup default.
 7. Restart the container and confirm the configuration, thumbnails, and media return.
