@@ -41,6 +41,20 @@ class MediaWorkerTests(unittest.TestCase):
             str(pathlib.Path("/config/folderframe-data/library.json")), "--manifest-only",
         ])
 
+    def test_cache_and_status_paths_are_forwarded(self):
+        command = WORKER.helper_command(
+            pathlib.Path("/helper.py"), pathlib.Path("/media"),
+            pathlib.Path("/config/thumbnails"),
+            pathlib.Path("/config/folderframe-data/library.json"),
+            True, True, 480, 80,
+            pathlib.Path("/config/folderframe-data/thumbnail-failures.json"),
+            pathlib.Path("/config/folderframe-data/worker-status.json"),
+        )
+        self.assertIn("--failure-cache", command)
+        self.assertIn(str(pathlib.Path("/config/folderframe-data/thumbnail-failures.json")), command)
+        self.assertIn("--status-file", command)
+        self.assertIn(str(pathlib.Path("/config/folderframe-data/worker-status.json")), command)
+
     def test_both_disabled_settings_are_supported(self):
         with mock.patch.dict(WORKER.os.environ, {
             "FOLDERFRAME_THUMBNAILS": "false",
@@ -72,6 +86,34 @@ class MediaWorkerTests(unittest.TestCase):
         with mock.patch.object(WORKER.subprocess, "run", side_effect=error), contextlib.redirect_stdout(output):
             self.assertFalse(WORKER.run_once(["helper"], None))
         self.assertIn("gallery remains available", output.getvalue())
+
+    def test_partial_thumbnail_failure_is_reported_as_complete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            status_path = pathlib.Path(directory) / "worker-status.json"
+            status_path.write_text(json.dumps({
+                "version": 1,
+                "outcome": "complete_with_warnings",
+                "mediaFiles": 10248,
+                "thumbnailsGenerated": 12,
+                "previewFailures": 3,
+                "unchangedFailuresSkipped": 8,
+            }), encoding="utf-8")
+            output = io.StringIO()
+            with mock.patch.object(WORKER.subprocess, "run"), contextlib.redirect_stdout(output):
+                self.assertTrue(WORKER.run_once(["helper"], None, status_path))
+            self.assertIn("scan complete with preview warnings", output.getvalue())
+            self.assertIn("10248 media files", output.getvalue())
+            self.assertIn("3 preview failures", output.getvalue())
+            self.assertNotIn("scan failed", output.getvalue())
+
+    def test_helper_failure_writes_failed_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            status_path = pathlib.Path(directory) / "worker-status.json"
+            error = subprocess.CalledProcessError(1, ["helper"])
+            with mock.patch.object(WORKER.subprocess, "run", side_effect=error):
+                self.assertFalse(WORKER.run_once(["helper"], None, status_path))
+            status = json.loads(status_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["outcome"], "failed")
 
 if __name__ == "__main__":
     unittest.main()

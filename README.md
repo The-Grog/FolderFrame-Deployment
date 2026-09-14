@@ -85,6 +85,7 @@ See [Unraid installation](UNRAID.md) for field details, updates, and troubleshoo
 | Configuration path | `/config` | Bind-mount a persistent directory read/write. The default JSON file is created on first start. |
 | Thumbnail cache | `/config/thumbnails` | Generated WebP previews inside the persistent configuration mount. |
 | Media manifest | `/config/folderframe-data/library.json` | Persistent root index; chunks are stored in `library.d/`. |
+| EXIF metadata | `/config/folderframe-data/exif.d/` | Generated allowlisted sidecars plus an internal extraction cache; GPS is off by default. |
 
 FolderFrame requires no database, privileged mode, host networking, PUID, or
 PGID. The appdata/configuration directory contains administrator-managed
@@ -158,9 +159,26 @@ folders appear on the next scan, and stale manifest chunks are removed. A
 missing or invalid manifest causes a logged full rebuild. Helper failures are
 logged but do not stop Caddy.
 
+Thumbnail failures are stored in
+`/config/folderframe-data/thumbnail-failures.json`, keyed by relative path,
+size, and modification time. Unchanged failures are skipped on later scans;
+changed or replaced sources are retried. A few failed previews produce a
+`scan complete with preview warnings` result instead of failing an otherwise
+valid manifest scan. The latest structured result is stored in
+`/config/folderframe-data/worker-status.json` and the worker log summarizes
+media files, generated previews, new preview failures, and unchanged failures
+skipped. Only scanner/helper or manifest failures report `scan failed`.
+
 JPEG, PNG, WebP, GIF, HEIC, and HEIF thumbnails are supported through Pillow
 and pillow-heif. Videos are indexed but do not receive generated thumbnails.
 Original media is never modified.
+
+When supported image EXIF exists, the same worker also writes allowlisted
+metadata sidecars under `/config/folderframe-data/exif.d/` and adds optional
+`captureDate` and `exifPath` fields to manifest records. GPS extraction
+remains off; the deployment worker does not enable the generator's opt-in
+`--include-gps` option. Sidecars are served for future metadata UI support,
+but the current client does not fetch them.
 
 For large Immich libraries, the first scan can take substantial time and
 appdata space. Later runs reuse unchanged directory records. Use a conservative
@@ -174,10 +192,13 @@ all appdata also resets custom configuration and thumbnails; first startup
 recreates defaults and performs a full scan.
 
 Advanced overrides are `FOLDERFRAME_MEDIA_PATH`,
-`FOLDERFRAME_THUMBNAIL_PATH`, and `FOLDERFRAME_MANIFEST_PATH`. Keep the
+`FOLDERFRAME_THUMBNAIL_PATH`, `FOLDERFRAME_MANIFEST_PATH`,
+`FOLDERFRAME_THUMBNAIL_FAILURE_CACHE_PATH`, and
+`FOLDERFRAME_WORKER_STATUS_PATH`. Keep the
 manifest filename `library.json`; public access is deliberately limited to
 `/folderframe-data/library.json`, `/folderframe-data/library.d/*.json`, and
-the thumbnail route.
+`/folderframe-data/exif.d/*.json`, and the thumbnail route. Internal dotfiles,
+including the EXIF extraction cache, are not served.
 
 ## Image tags
 

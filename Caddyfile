@@ -47,6 +47,13 @@
 		header Cache-Control "no-store"
 		file_server
 	}
+	handle_path /folderframe-data/exif.d/* {
+		root * {$FOLDERFRAME_MANIFEST_ROOT:/config/folderframe-data}/exif.d
+		header Cache-Control "no-store"
+		file_server {
+			hide .*
+		}
+	}
 
 	handle {
 		root * /srv/app
