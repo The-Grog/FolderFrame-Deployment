@@ -63,8 +63,9 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertEqual(root.findtext("Repository"), "ghcr.io/the-grog/folderframe-deployment:stable")
         self.assertEqual(root.findtext("Privileged"), "false")
         configs = {node.attrib["Name"]: node.attrib for node in root.findall("Config")}
-        self.assertEqual(configs["Media Folder"]["Target"], "/media")
+        self.assertEqual(configs["Media Folder"]["Target"], "/media/Library")
         self.assertEqual(configs["Media Folder"]["Mode"], "ro")
+        self.assertIn("Do not mount anything at /media itself", configs["Media Folder"]["Description"])
         self.assertEqual(configs["Media Folder"]["Default"], "")
         self.assertEqual(configs["Web Port"]["Target"], "8080")
         self.assertEqual(configs["Appdata Configuration"]["Target"], "/config")
@@ -105,8 +106,9 @@ class PublicMetadataTests(unittest.TestCase):
 
     def test_compose_uses_persistent_config_and_read_only_media(self):
         text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
-        self.assertIn("source: ${MEDIA_PATH:?", text)
-        self.assertIn("target: /media", text)
+        self.assertIn("source: ${MEDIA_LIBRARY_PATH:?", text)
+        self.assertIn("target: /media/Library", text)
+        self.assertNotIn("target: /media\n", text)
         self.assertIn("read_only: true", text)
         self.assertIn("source: ${CONFIG_PATH:-./config}", text)
         self.assertIn("target: /config", text)
@@ -145,6 +147,7 @@ class PublicMetadataTests(unittest.TestCase):
         for variable in UNRAID_OVERRIDES.values():
             with self.subTest(variable=variable):
                 self.assertIn(variable, entrypoint)
+        self.assertIn("rm -rf /media/cdrom /media/floppy /media/usb", dockerfile)
         self.assertIn("FOLDERFRAME_THUMBNAILS", entrypoint)
         self.assertIn("FOLDERFRAME_MANIFEST", entrypoint)
         self.assertIn('manifestPath = "folderframe-data/library.json"', entrypoint)

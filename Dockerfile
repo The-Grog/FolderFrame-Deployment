@@ -16,8 +16,11 @@ COPY docker-entrypoint.sh /usr/bin/folderframe-entrypoint
 COPY thumbnail_worker.py /usr/share/folderframe/thumbnail_worker.py
 COPY transcode_service.py service_runner.py /usr/share/folderframe/
 
+# `/media` is an image-owned mount parent. Do not bind-mount it read-only:
+# Docker must be able to create sibling bind targets below it.
 RUN apk add --no-cache jq python3 py3-pip py3-pillow "ffmpeg=${FFMPEG_VERSION}" \
     && python3 -m pip install --no-cache-dir --break-system-packages --no-deps pillow-heif==1.5.0 \
+    && rm -rf /media/cdrom /media/floppy /media/usb \
     && mkdir -p /media /config /run/folderframe \
     && chmod 0755 /usr/bin/folderframe-entrypoint \
     && chmod 0755 /usr/share/folderframe/thumbnail_worker.py \

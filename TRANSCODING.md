@@ -17,7 +17,8 @@ Static-only installations have no service and continue using normal recovery UI.
 - `GET /folderframe-api/capabilities`: `{ "videoTranscode": true, "mediaPath": "/photos/" }`.
   Disabled service returns `videoTranscode: false`.
 - `GET /folderframe-api/transcode?path=<URL-encoded path relative to /media>`:
-  chunked fragmented MP4. Supports nested additional mounts under `/media/`.
+  chunked fragmented MP4. Supports sibling library mounts such as
+  `/media/Library` and `/media/Archive` beneath an unmounted `/media` parent.
 - `FOLDERFRAME_VIDEO_TRANSCODE=true`: enable the optional fallback; `false`
   disables conversion and the endpoint returns 404.
 - `FOLDERFRAME_TRANSCODE_JOBS=2`: maximum active jobs (1–8); excess requests get 503.
