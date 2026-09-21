@@ -13,7 +13,7 @@ docker run -d \
   --name folderframe \
   --restart unless-stopped \
   -p 8088:8080 \
-  --mount type=bind,source=/absolute/path/to/media,target=/media,readonly \
+  --mount type=bind,source=/absolute/path/to/media,target=/media/Library,readonly \
   --mount type=bind,source=/absolute/path/to/folderframe-config,target=/config \
   ghcr.io/the-grog/folderframe-deployment:stable
 ```
@@ -22,8 +22,8 @@ Open `http://SERVER-IP:8088/`. Change the host port if 8088 is already in use.
 
 ### Multiple media folders
 
-Mount each additional host directory at a unique child path below `/media`.
-FolderFrame presents those child paths as top-level albums and its thumbnail and
+Mount every host directory at a unique sibling path below an otherwise unmounted `/media` parent.
+FolderFrame presents those paths as top-level albums and its thumbnail and
 manifest worker scans them together:
 
 ```sh
@@ -38,7 +38,9 @@ docker run -d \
 ```
 
 Every container destination must be unique and remain under `/media/`, such as
-`/media/Family` or `/media/Archive`. Keep every media mount read-only. Docker
+`/media/Library`, `/media/Family`, or `/media/Archive`. Do not bind-mount
+`/media` itself: a read-only parent prevents Docker from creating child mount targets.
+Keep every media mount read-only. Docker
 Compose users can add equivalent entries beneath the service's `volumes` list.
 See [Unraid installation](UNRAID.md#additional-media-folders) for the WebGUI
 workflow.
@@ -51,11 +53,32 @@ use `FOLDERFRAME_THUMBNAIL_INTERVAL` (default 3600 seconds).
 
 ## Quick start with Docker Compose
 
-Copy `.env.example` to `.env`, set `MEDIA_PATH` to an absolute existing directory, and optionally set `CONFIG_PATH` or common FolderFrame overrides. Then run:
+Copy `.env.example` to `.env`, set `MEDIA_LIBRARY_PATH` to an absolute existing directory, and optionally set `CONFIG_PATH` or common FolderFrame overrides. The primary library is mounted at `/media/Library`. Then run:
 
 ```sh
 docker compose up -d
 ```
+
+To add another library, add this read-only sibling entry to the service's `volumes` list and define `MEDIA_ARCHIVE_PATH` in `.env`:
+
+```yaml
+      - type: bind
+        source: ${MEDIA_ARCHIVE_PATH:?Set MEDIA_ARCHIVE_PATH in .env to an absolute existing media directory}
+        target: /media/Archive
+        read_only: true
+```
+
+### Migrate an existing `/media` mount
+
+Stop and recreate an older container that bind-mounts its primary library at
+`/media`. For `docker run`, change only its destination to `/media/Library`.
+For Compose, rename `MEDIA_PATH` to `MEDIA_LIBRARY_PATH`, update to this
+`compose.yaml`, and run `docker compose up -d`. Host media stays in place and
+existing `folderframe.config.json` does not need editing: `photos/` remains the
+browser route. Add further libraries only as read-only siblings such as
+`/media/Archive`; never bind-mount `/media` itself. See the
+[Unraid migration steps](UNRAID.md#migrate-an-existing-media-mount) for the
+WebGUI equivalent.
 
 The default `CONFIG_PATH` is `./config`. The container creates `folderframe.config.json` there on first start.
 Compose enables persistent thumbnails and the media manifest by default. Set
@@ -81,7 +104,7 @@ See [Unraid installation](UNRAID.md) for field details, updates, and troubleshoo
 | Setting | Container value | Purpose |
 | --- | --- | --- |
 | HTTP port | `8080/tcp` | Map any unused host port to this container port. |
-| Media path | `/media` or unique paths below `/media/` | Bind-mount one or more dedicated host media directories read-only. |
+| Media path | `/media/Library` and unique sibling paths below `/media/` | Bind-mount one or more dedicated host media directories read-only. Leave `/media` itself unmounted. |
 | Configuration path | `/config` | Bind-mount a persistent directory read/write. The default JSON file is created on first start. |
 | Thumbnail cache | `/config/thumbnails` | Generated WebP previews inside the persistent configuration mount. |
 | Media manifest | `/config/folderframe-data/library.json` | Persistent root index; chunks are stored in `library.d/`. |

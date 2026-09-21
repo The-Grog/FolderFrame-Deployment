@@ -26,7 +26,7 @@ jobs:
           sudo apt-get install -y ffmpeg
           python3 -m unittest discover -s scripts -p 'test_transcode_service.py'
       - name: Validate Docker Compose example
-        run: MEDIA_PATH=/tmp/folderframe-media docker compose config --quiet
+        run: MEDIA_LIBRARY_PATH=/tmp/folderframe-library docker compose config --quiet
   publish:
     if: github.event_name == 'workflow_dispatch'
     needs: validate
@@ -90,18 +90,32 @@ jobs:
             --label "org.opencontainers.image.version=$APP_TAG" \
             --label "io.folderframe.deployment-revision=$GITHUB_SHA" \
             -t folderframe:ci .
-          mkdir -p /tmp/folderframe-config
-          mkdir -p /tmp/folderframe-media
-          python3 - <<'PY'
+          mkdir -p /tmp/folderframe-config /tmp/folderframe-library /tmp/folderframe-archive
+          docker run --rm -i --entrypoint python3 \
+            -v /tmp/folderframe-library:/work folderframe:ci - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          image = Image.new("RGB", (8, 8), (40, 120, 200))
+          exif = Image.Exif()
+          exif[306] = "2025:01:02 03:04:05"
+          exif[315] = "FolderFrame CI"
+          image.save("/work/library.jpg", exif=exif)
+          PY
+          docker run --rm -i --entrypoint python3 \
+            -v /tmp/folderframe-archive:/work folderframe:ci - <<'PY'
           import base64
           from pathlib import Path
-          Path("/tmp/folderframe-media/smoke.png").write_bytes(base64.b64decode(
+          Path("/work/archive.png").write_bytes(base64.b64decode(
               "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
           ))
           PY
+          docker run --rm --entrypoint sh \
+            -v /tmp/folderframe-archive:/work folderframe:ci -c \
+            'ffmpeg -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=64x48:rate=24 -f lavfi -i sine=frequency=440 -t 1 -c:v mpeg4 -c:a aac /work/fallback.mov'
           docker run -d --name smoke -p 127.0.0.1:8088:8080 \
             -v /tmp/folderframe-config:/config \
-            -v /tmp/folderframe-media:/media:ro \
+            -v /tmp/folderframe-library:/media/Library:ro \
+            -v /tmp/folderframe-archive:/media/Archive:ro \
             -e FOLDERFRAME_SOURCE_LABEL=Gallery \
             -e FOLDERFRAME_STARTING_VIEW=all \
             -e FOLDERFRAME_DEFAULT_SORT=oldest \
@@ -120,6 +134,14 @@ jobs:
             test -s /tmp/asset
           done
           curl --fail http://127.0.0.1:8088/photos/ -o /tmp/listing.html
+          grep -q 'Library' /tmp/listing.html
+          grep -q 'Archive' /tmp/listing.html
+          ! grep -Eq 'cdrom|floppy|usb' /tmp/listing.html
+          curl --fail http://127.0.0.1:8088/photos/Library/ -o /tmp/library-listing.html
+          curl --fail http://127.0.0.1:8088/photos/Archive/ -o /tmp/archive-listing.html
+          grep -q 'library.jpg' /tmp/library-listing.html
+          grep -q 'archive.png' /tmp/archive-listing.html
+          grep -q 'fallback.mov' /tmp/archive-listing.html
           curl --fail "http://127.0.0.1:8088/app.js?v=smoke-${APP_SHA}" -o /tmp/deployed-app.js
           curl --fail "http://127.0.0.1:8088/index.html?v=smoke-${APP_SHA}" -o /tmp/deployed-index.html
           grep -q 'function cycleGridDensity' /tmp/deployed-app.js
@@ -129,16 +151,37 @@ jobs:
           curl --fail http://127.0.0.1:8088/folderframe.config.json -o /tmp/runtime-config.json
           python3 -c 'import json; c=json.load(open("/tmp/runtime-config.json")); assert c["sources"][0]["label"] == "Gallery"; assert c["sources"][0]["thumbnailPath"] == "thumbnails/"; assert c["sources"][0]["manifestPath"] == "folderframe-data/library.json"; assert c["defaults"]["gridDensity"] == "comfortable"; assert c["defaults"] == c["defaults"] | {"view":"all","sort":"oldest","interval":10,"imageMode":"original","autoplay":True,"shuffle":True,"rememberPreferences":False}; assert c["index"]["refreshInterval"] == 77; assert c["embed"]["refreshInterval"] == 88'
           for attempt in $(seq 1 30); do
-            test -s /tmp/folderframe-config/thumbnails/smoke.png.webp && test -s /tmp/folderframe-config/folderframe-data/library.json && break
+            test -s /tmp/folderframe-config/thumbnails/Library/library.jpg.webp && test -s /tmp/folderframe-config/thumbnails/Archive/archive.png.webp && test -s /tmp/folderframe-config/folderframe-data/exif.d/Library/library.jpg.json && test -s /tmp/folderframe-config/folderframe-data/library.json && break
             sleep 1
           done
-          test -s /tmp/folderframe-config/thumbnails/smoke.png.webp
+          test -s /tmp/folderframe-config/thumbnails/Library/library.jpg.webp
           test -s /tmp/folderframe-config/folderframe-data/library.json
-          python3 -c 'import json; m=json.load(open("/tmp/folderframe-config/folderframe-data/library.json")); assert m["version"] == 1; assert any(f["path"] == "smoke.png" for f in m["root"]["files"])'
-          curl --fail http://127.0.0.1:8088/thumbnails/smoke.png.webp -o /tmp/smoke-thumb.webp
+          test -s /tmp/folderframe-config/thumbnails/Archive/archive.png.webp
+          test -s /tmp/folderframe-config/folderframe-data/exif.d/Library/library.jpg.json
+          python3 -c 'import json; m=json.load(open("/tmp/folderframe-config/folderframe-data/library.json")); assert m["version"] == 1; assert set(m["chunks"]) == {"Archive", "Library"}'
+          curl --fail http://127.0.0.1:8088/thumbnails/Library/library.jpg.webp -o /tmp/library-thumb.webp
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("/tmp/folderframe-config/folderframe-data")
+          index = json.loads((root / "library.json").read_text())
+          records = {}
+          for descriptor in index["chunks"].values():
+              chunk = json.loads((root / descriptor["file"]).read_text())
+              for directory in chunk["directories"].values():
+                  records.update({record["path"]: record for record in directory["files"]})
+          assert {"Archive/archive.png", "Library/library.jpg"} <= set(records)
+          assert records["Library/library.jpg"]["exifPath"] == "exif.d/Library/library.jpg.json"
+          PY
           curl --fail http://127.0.0.1:8088/folderframe-data/library.json -o /tmp/smoke-manifest.json
-          test -s /tmp/smoke-thumb.webp
+          test -s /tmp/library-thumb.webp
           python3 -c 'import json; c=json.load(open("/tmp/folderframe-config/folderframe.config.json")); assert c["sources"][0]["label"] != "Gallery"; assert c["defaults"]["view"] != "all"'
+          curl --fail http://127.0.0.1:8088/thumbnails/Archive/archive.png.webp -o /tmp/archive-thumb.webp
+          curl --fail http://127.0.0.1:8088/folderframe-data/exif.d/Library/library.jpg.json -o /tmp/library-exif.json
+          test -s /tmp/archive-thumb.webp
+          python3 -c 'import json; assert json.load(open("/tmp/library-exif.json"))["captureDate"]'
+          curl --fail --max-time 30 'http://127.0.0.1:8088/folderframe-api/transcode?path=Archive%2Ffallback.mov' -o /tmp/fallback.mp4
+          docker run --rm -i --entrypoint ffmpeg folderframe:ci -hide_banner -loglevel error -i pipe:0 -f null - < /tmp/fallback.mp4
           docker restart smoke
           curl --retry 10 --retry-all-errors --retry-delay 1 --retry-max-time 30 --fail http://127.0.0.1:8088/folderframe.config.json -o /tmp/restarted-config.json
           cmp /tmp/runtime-config.json /tmp/restarted-config.json

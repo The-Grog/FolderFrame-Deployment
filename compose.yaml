@@ -7,8 +7,8 @@ services:
       - "${WEB_PORT:-8088}:8080"
     volumes:
       - type: bind
-        source: ${MEDIA_PATH:?Set MEDIA_PATH in .env to an absolute existing media directory}
-        target: /media
+        source: ${MEDIA_LIBRARY_PATH:?Set MEDIA_LIBRARY_PATH in .env to an absolute existing media directory}
+        target: /media/Library
         read_only: true
       - type: bind
         source: ${CONFIG_PATH:-./config}

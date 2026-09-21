@@ -36,10 +36,12 @@ and `THIRD_PARTY_NOTICES.md`; older release inputs intentionally fail the copy
 step. Coordinate the core release before publishing this recipe. Run the Linux
 transcode tests with FFmpeg, and verify streaming through Caddy, client
 disconnect cleanup, and source/license availability. See TRANSCODING.md.
-Mount separate temporary `/media` and `/config` directories and confirm the
-worker creates a WebP, `/config/folderframe-data/library.json`, and chunk
-files without changing media. Test all four toggle modes, rebuild logging, and
-that a helper failure leaves the gallery available.
+Mount temporary sibling libraries at `/media/Library` and `/media/Archive`,
+plus a separate `/config` directory. Confirm Caddy lists both libraries, the
+worker creates WebPs, EXIF sidecars, `/config/folderframe-data/library.json`,
+and chunk files without changing media, and video fallback can read a file in a
+sibling library. Keep `/media` itself unmounted. Test all four toggle modes,
+rebuild logging, and that a helper failure leaves the gallery available.
 
 ## Community Apps
 

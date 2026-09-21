@@ -14,14 +14,14 @@ to set `FOLDERFRAME_VIDEO_TRANSCODE=false`, `FOLDERFRAME_TRANSCODE_JOBS=1`, or
 
 1. Open the **Apps** tab and search for **FolderFrame**.
 2. Select FolderFrame.
-3. Choose an existing dedicated **Media Folder** containing only media intended for this gallery.
+3. Choose an existing dedicated **Media Folder** containing only media intended for this gallery. The template mounts it at `/media/Library` read-only.
 4. Keep the default **Appdata Configuration** path or choose another persistent directory.
 5. Choose an unused **Web Port**.
 6. Keep **Generate Thumbnails** and **Persistent Media Manifest** set to `true` for faster large galleries.
 7. Optionally set any other FolderFrame defaults. Leave an override blank to use `folderframe.config.json`.
 8. Click **Apply**, then open the FolderFrame WebUI.
 
-The media directory is mounted at `/media` read-only. Configuration, generated thumbnails, and the persistent manifest are stored separately under `/config`.
+The media library is mounted at `/media/Library` read-only. The `/media` parent stays unmounted so Docker can create additional sibling mounts. Configuration, generated thumbnails, and the persistent manifest are stored separately under `/config`.
 
 ## Additional media folders
 
@@ -36,8 +36,8 @@ manifest scan.
 4. Select the additional host directory in **Host Path**. For an SMB share,
    mount it on Unraid first and select its Linux path, commonly below
    `/mnt/remotes/`; Windows UNC paths cannot be used directly by the container.
-5. Set **Container Path** to a unique child of `/media/`, such as
-   `/media/Archive`. Do not reuse `/media` or another mapping's container path.
+5. Set **Container Path** to a unique sibling below `/media/`, such as
+   `/media/Archive`. Do not use `/media` itself or reuse another mapping's path.
 6. Set **Access Mode** to **Read Only**.
 7. Click **Add**, then **Apply** to recreate the container with the new mount.
 
@@ -46,6 +46,26 @@ path each time—for example `/media/Family`, `/media/Archive`, and
 `/media/Scans`. Folder names beneath `/media/` become the album names shown in
 FolderFrame. The existing `photos/` source and generated thumbnail/manifest
 configuration do not need to change.
+
+
+## Migrate an existing `/media` mount
+
+Older FolderFrame containers mounted the primary host directory directly at
+`/media`. That layout cannot support a second read-only library because Docker
+cannot create `/media/AnotherLibrary` beneath a read-only bind mount.
+
+1. Stop the container, then open **Edit** in the Unraid Docker tab.
+2. Change the existing **Media Folder** container path from `/media` to
+   `/media/Library`. Keep its host path and **Read Only** access mode unchanged.
+3. Add any additional libraries at distinct sibling paths such as
+   `/media/Archive` or `/media/Scans`; never mount `/media` itself.
+4. Apply the change and open FolderFrame. The primary library now appears as
+   the top-level **Library** album.
+5. The manifest and thumbnail worker rebuild paths automatically. To reclaim
+   no-longer-referenced generated previews after confirming the new gallery,
+   stop the container and delete only `/config/thumbnails/` and
+   `/config/folderframe-data/`; do not delete original media. Start the
+   container to generate fresh caches.
 
 ## Persistent configuration
 
@@ -148,8 +168,9 @@ After applying the template:
 5. Confirm nested folders and images appear while generation is still running.
 6. Change one container override, apply the edit, and verify it changes the startup default.
 7. Restart the container and confirm the configuration, thumbnails, and media return.
-8. Edit the container and verify every `/media` mapping shows **Read Only** and
-   uses a unique container path.
+8. Edit the container and verify every media mapping shows **Read Only**, uses
+   a unique sibling path below `/media/`, and that nothing is mounted at
+   `/media` itself.
 
 ## Updating
 
