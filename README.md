@@ -188,9 +188,20 @@ size, and modification time. Unchanged failures are skipped on later scans;
 changed or replaced sources are retried. A few failed previews produce a
 `scan complete with preview warnings` result instead of failing an otherwise
 valid manifest scan. The latest structured result is stored in
-`/config/folderframe-data/worker-status.json` and the worker log summarizes
-media files, generated previews, new preview failures, and unchanged failures
+`/config/folderframe-data/worker-status.json`: it reports `outcome: "running"`
+while a scan is active. The previous valid manifest remains usable until the
+helper atomically publishes its replacement; completion then replaces the
+running status with the detailed final result. The worker log summarizes media
+files, generated previews, new preview failures, and unchanged failures
 skipped. Only scanner/helper or manifest failures report `scan failed`.
+
+Successful preview signatures are stored separately in
+`/config/folderframe-data/thumbnail-cache.json` (override with
+`FOLDERFRAME_THUMBNAIL_CACHE_PATH`). Matching size and nanosecond mtime allow a
+WebP preview to be reused; a changed source is regenerated even if an old WebP
+is newer. After complete source discovery, orphaned generated WebPs and empty
+preview directories are pruned. Incomplete discovery retains uncertain previews.
+The first upgraded scan may reconcile previews that lack trusted signatures.
 
 JPEG, PNG, WebP, GIF, HEIC, and HEIF thumbnails are supported through Pillow
 and pillow-heif. Videos are indexed but do not receive generated thumbnails.

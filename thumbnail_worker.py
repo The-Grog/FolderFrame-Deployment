@@ -83,7 +83,7 @@ def status_summary(status: dict) -> str:
 def helper_command(helper: Path, media_root: Path, thumbnail_root: Path,
         manifest_path: Path, thumbnails: bool, manifest: bool,
         size: int, quality: int, failure_cache_path: Path | None = None,
-        status_path: Path | None = None) -> list[str]:
+        thumbnail_cache_path: Path | None = None, status_path: Path | None = None) -> list[str]:
     command = [sys.executable, str(helper), str(media_root)]
     if thumbnails:
         command.extend([str(thumbnail_root), "--size", str(size), "--quality", str(quality)])
@@ -93,10 +93,11 @@ def helper_command(helper: Path, media_root: Path, thumbnail_root: Path,
             command.append("--manifest-only")
     if thumbnails and failure_cache_path is not None:
         command.extend(["--failure-cache", str(failure_cache_path)])
+    if thumbnails and thumbnail_cache_path is not None:
+        command.extend(["--thumbnail-cache", str(thumbnail_cache_path)])
     if status_path is not None:
         command.extend(["--status-file", str(status_path)])
     return command
-
 def run_once(command: list[str], manifest_path: Path | None,
         status_path: Path | None = None) -> bool:
     if manifest_path is not None:
@@ -105,11 +106,18 @@ def run_once(command: list[str], manifest_path: Path | None,
             log("persistent manifest is missing; helper will rebuild the full index")
         elif status == "invalid":
             log("persistent manifest is invalid; helper will rebuild the full index")
+    started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    write_status(status_path, {
+        "version": 1,
+        "outcome": "running",
+        "startedAt": started_at,
+    })
     try:
         subprocess.run(command, check=True)
     except (OSError, subprocess.CalledProcessError) as error:
         write_status(status_path, {
             "version": 1,
+            "startedAt": started_at,
             "completedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "outcome": "failed",
             "error": str(error),
@@ -137,6 +145,10 @@ def main() -> int:
         "FOLDERFRAME_THUMBNAIL_FAILURE_CACHE_PATH",
         "/config/folderframe-data/thumbnail-failures.json",
     )).resolve()
+    thumbnail_cache_path = Path(os.environ.get(
+        "FOLDERFRAME_THUMBNAIL_CACHE_PATH",
+        "/config/folderframe-data/thumbnail-cache.json",
+    )).resolve()
     status_path = Path(os.environ.get(
         "FOLDERFRAME_WORKER_STATUS_PATH", "/config/folderframe-data/worker-status.json"
     )).resolve()
@@ -159,7 +171,8 @@ def main() -> int:
     status_path.parent.mkdir(parents=True, exist_ok=True)
     command = helper_command(helper, media_root, thumbnail_root, manifest_path,
         thumbnails, manifest, size, quality,
-        failure_cache_path if thumbnails else None, status_path)
+        failure_cache_path if thumbnails else None,
+        thumbnail_cache_path if thumbnails else None, status_path)
     mode = "thumbnails+manifest" if thumbnails and manifest else (
         "thumbnails-only" if thumbnails else "manifest-only"
     )

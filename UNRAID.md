@@ -128,6 +128,14 @@ To force a rebuild, stop the container, delete only
 `library.d/`, then restart. Deleting all appdata also deletes custom
 configuration and thumbnails.
 
+The worker records successful preview source signatures in
+`/mnt/user/appdata/folderframe/folderframe-data/thumbnail-cache.json`. It prunes
+only generated orphan `.webp` previews after a complete media discovery; mount
+or stat errors retain uncertain previews. A path with changed size or nanosecond
+mtime is regenerated rather than reusing a possibly unrelated preview. The first
+scan after upgrading may reconcile unsigned existing previews. Media mounts stay
+read-only and originals are never modified.
+
 FolderFrame resolves startup settings in this order: packaged defaults, persistent JSON, explicit container overrides, saved browser preferences, then URL parameters. If a changed default appears to have no effect, set **Remember Browser Preferences** to `false`, clear that browser's saved FolderFrame preferences, or test with `?remember=0`.
 
 ## Existing installations
