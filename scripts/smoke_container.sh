@@ -16,7 +16,7 @@ mkdir -p "$config" "$library" "$archive"
 cleanup() {
   docker logs "$name" 2>/dev/null || true
   docker rm -f "$name" >/dev/null 2>&1 || true
-  rm -rf "$work"
+  rm -rf "$work" 2>/dev/null || true
 }
 trap cleanup EXIT
 
