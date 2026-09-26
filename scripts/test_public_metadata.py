@@ -158,7 +158,8 @@ class PublicMetadataTests(unittest.TestCase):
         self.assertIn("COPY upstream/generate_thumbnails.py", dockerfile)
         self.assertIn("upstream/docs/images/folderframe-logo-back.png", dockerfile)
         self.assertIn("!upstream/docs/images/folderframe-logo-back.png", dockerignore)
-        self.assertIn("docs/images/folderframe-logo-back.png", publish_workflow)
+        smoke_workflow = (ROOT / "scripts" / "smoke_container.sh").read_text(encoding="utf-8")
+        self.assertIn("docs/images/folderframe-logo-back.png", smoke_workflow)
         self.assertIn("pillow-heif==1.5.0", dockerfile)
 
 

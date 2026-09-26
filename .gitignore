@@ -37,4 +37,7 @@
 !/scripts/test_public_metadata.py
 !/scripts/test_thumbnail_worker.py
 !/scripts/test_transcode_service.py
+!/scripts/test_multiarch_workflow.py
+!/scripts/verify_image_index.py
+!/scripts/smoke_container.sh
 !/icon.png

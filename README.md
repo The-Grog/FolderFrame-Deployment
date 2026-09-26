@@ -234,12 +234,59 @@ manifest filename `library.json`; public access is deliberately limited to
 `/folderframe-data/exif.d/*.json`, and the thumbnail route. Internal dotfiles,
 including the EXIF extraction cache, are not served.
 
+## Supported architectures
+
+The deployment workflow now targets a single multi-platform image index for
+`linux/amd64` and `linux/arm64`. First publication through the updated workflow
+is still pending; do not assume an existing tag includes ARM64 until its remote
+index has been verified. Once published, Docker automatically selects the
+matching image for the host. A Raspberry Pi requires a 64-bit operating system
+and an ARM64-capable model; `linux/arm/v7` and other 32-bit Pi installations are
+not supported by this image.
+
+The release workflow builds each platform once, pushes it under a run-scoped
+candidate tag, and smoke-tests that immutable digest. It then verifies the combined
+candidate index before moving any release tag. ARM64 currently runs under QEMU on
+the GitHub-hosted AMD64 builder. That verifies container execution and real
+JPEG/HEIF decoding, thumbnail and EXIF/manifest generation, incremental reuse,
+worker status, Caddy serving, and FFmpeg fallback under emulation; it is not a
+substitute for native Raspberry Pi performance and browser playback testing.
+
+Maintainers can build and load either platform locally after preparing the
+release checkout under `upstream/`:
+
+```sh
+docker buildx create --use --name folderframe-builder
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+docker buildx build --platform linux/amd64 --load -t folderframe:amd64 .
+scripts/smoke_container.sh folderframe:amd64 linux/amd64 x86_64 APP_SHA
+docker buildx build --platform linux/arm64 --load -t folderframe:arm64 .
+scripts/smoke_container.sh folderframe:arm64 linux/arm64 aarch64 APP_SHA
+```
+
+After a future authorized release, inspect the remote index and require both
+platform descriptors:
+
+```sh
+docker buildx imagetools inspect ghcr.io/the-grog/folderframe-deployment:stable
+docker buildx imagetools inspect --raw \
+  ghcr.io/the-grog/folderframe-deployment:stable > image-index.json
+python3 scripts/verify_image_index.py image-index.json
+```
+
+Native ARM64 validation remains required before claiming Raspberry Pi hardware
+performance or browser/device playback support. Run the same ARM64 smoke command
+on a native 64-bit ARM Docker host, then verify the gallery and representative
+HEIF/video playback in that device's browser.
 ## Image tags
 
 - `stable`: latest stable FolderFrame release that passed deployment tests. Recommended for normal installs.
-- `vX.Y.Z`: immutable application version tag for pinning and rollback.
+- `vX.Y.Z`: identifies the core application release. A packaging rebuild can move
+  this image tag; use `image@sha256:...` for immutable pinning and rollback.
 - `build-<app-sha>-<deployment-sha>`: identifies both the app and packaging revisions.
-- `test`: most recently tested build; intended for deployment testing rather than normal installs.
+- `test`: most recently promoted tested build; intended for deployment testing rather than normal installs.
+- `candidate-<run-id>-<attempt>[-<architecture>]`: temporary workflow candidates;
+  they may exist even when validation fails and are not release tags.
 
 Updates never modify a running container automatically. Pull the image and recreate the container, or use your platform's container update function. Read the [FolderFrame releases](https://github.com/The-Grog/FolderFrame/releases) before updating.
 
