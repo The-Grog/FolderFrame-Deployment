@@ -29,30 +29,28 @@ A packaging change can rebuild an existing app release, so rollback-sensitive
 users should record an image digest. Application version image tags are not
 immutable packaging identifiers.
 
-## Versioning and the pending multi-architecture release
+## Versioning and verified multi-architecture publication
 
-Adding ARM64 support warrants deployment release notes, but a packaging-only
-change does not require a new core application version. The workflow always uses
-the latest published stable core release and records both its revision and the
+Adding ARM64 support warrants deployment release notes, but this packaging-only
+change did not require a new core application version. The workflow uses the
+latest published stable core release and records both its revision and the
 deployment revision. A deployment-repository tag alone does not select the app
-version or publish an image. If this is bundled with new core fixes, publish the
-new core release first, then dispatch the deployment workflow.
+release.
 
-Pending release notes:
+Verified publication:
 
-- Add `linux/amd64` and `linux/arm64` image targets with automatic host selection.
-- Smoke-test each immutable candidate with real JPEG/HEIF, EXIF, manifests,
-  incremental thumbnails, worker status, read-only libraries, and video fallback.
-- Verify the combined candidate index before promoting release tags, without a
-  second build between testing and publication.
-- Require a 64-bit OS for ARM64 Raspberry Pi use; `linux/arm/v7` remains unsupported.
-- Native ARM hardware performance and browser playback validation remain pending.
+- Core release: `v0.8.3` at `2b098094b9ab4d2d024d6c3c5d3263cb7e2b91a6`.
+- Deployment recipe used to build the image: `110b8fa130c688f79557bc1a991ce80d35e9e8fe`.
+- Workflow: [Publish release image #36217656032](https://github.com/The-Grog/FolderFrame-Deployment/actions/runs/36217656032).
+- Verified multi-platform index: `sha256:387e5723778e06540f4d10d7278c98747f81dbe72f349b2ddd799d4c81914830`.
+- Immutable `linux/amd64` and `linux/arm64` candidates passed smoke tests before
+  the index was assembled and promoted to `build-2b098094b9ab-110b8fa130c6`,
+  `v0.8.3`, `test`, and `stable`.
 
-Before marking this released, record the successful workflow run, core and
-packaging revisions, verified index digest and platform descriptors. Update the
-README's pending-publication notice only after that verification. Publishing an
-image does not authorize updating or restarting the production container.
-
+A 64-bit operating system is required for ARM64 Raspberry Pi use. `linux/arm/v7`
+remains unsupported. Native ARM hardware performance and browser playback remain
+open validation; QEMU smoke tests are not device validation. Publishing an image
+does not authorize updating or restarting the production container.
 ## Build inputs
 
 The workflow resolves the latest stable FolderFrame release to an immutable commit, checks it out as `upstream`, and lets Docker access only files allowlisted in `.dockerignore`. Never replace the explicit copies with `COPY .` or copy the whole application repository.
