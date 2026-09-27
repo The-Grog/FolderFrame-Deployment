@@ -69,6 +69,28 @@ class MultiArchitectureWorkflowTests(unittest.TestCase):
         self.assertLess(smoke_arm64, verify)
         self.assertLess(verify, promote)
 
+    def test_publish_workflow_mirrors_only_verified_end_user_tags_to_docker_hub(self):
+        workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
+        mirror = workflow.split("- name: Mirror verified GHCR release to Docker Hub", 1)[1]
+        self.assertIn("mirror_existing_ghcr:", workflow)
+        self.assertIn("MIRROR_EXISTING: ${{ github.event.inputs.mirror_existing_ghcr }}", mirror)
+        self.assertIn("steps.existing.outputs.build_required == 'true'", workflow)
+        self.assertIn("if: steps.release.outputs.available == 'true'", mirror)
+        self.assertIn("DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}", mirror)
+        self.assertIn("DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}", mirror)
+        self.assertIn('dockerhub_image="docker.io/${DOCKERHUB_USERNAME}/folderframe"', mirror)
+        self.assertIn('source_ref="$ghcr_image:stable"', mirror)
+        self.assertIn('"$ghcr_image@$source_digest"', mirror)
+        self.assertIn('--tag "$dockerhub_image:latest"', mirror)
+        self.assertIn('--tag "$dockerhub_image:stable"', mirror)
+        self.assertIn('--tag "$dockerhub_image:$APP_TAG"', mirror)
+        self.assertIn('for tag in latest stable "$APP_TAG"', mirror)
+        self.assertIn('python3 scripts/verify_image_index.py "$destination_raw"', mirror)
+        self.assertIn('Docker Hub does not reference the verified GHCR platform manifests', mirror)
+        self.assertIn('test "$mirrored_recipe" = "$recipe_sha"', mirror)
+        self.assertNotIn('--tag "$dockerhub_image:candidate-', mirror)
+        self.assertNotIn('--tag "$dockerhub_image:build-', mirror)
+        self.assertNotIn('--tag "$dockerhub_image:test"', mirror)
     def test_smoke_test_exercises_real_media_paths(self):
         smoke = (ROOT / "scripts" / "smoke_container.sh").read_text(encoding="utf-8")
         for expected in (

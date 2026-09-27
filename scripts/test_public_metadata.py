@@ -123,6 +123,12 @@ class PublicMetadataTests(unittest.TestCase):
                 self.assertIn(f'{variable}: "${{{variable}:-{default}}}"', text)
         self.assertNotIn("privileged:", text)
 
+    def test_readme_documents_docker_hub_as_an_additional_official_source(self):
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("https://hub.docker.com/r/thegrog/folderframe", text)
+        self.assertIn("docker pull thegrog/folderframe:stable", text)
+        self.assertIn("docker pull thegrog/folderframe:latest", text)
+        self.assertIn("ghcr.io/the-grog/folderframe-deployment:stable", text)
     def test_container_serves_generated_config(self):
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")

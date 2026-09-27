@@ -1,6 +1,12 @@
 name: Publish release image
 on:
   workflow_dispatch:
+    inputs:
+      mirror_existing_ghcr:
+        description: Mirror an already verified matching GHCR stable image without rebuilding it
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: '23 9 * * *'
   push:
@@ -52,6 +58,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APP_SHA: ${{ steps.release.outputs.sha }}
           APP_TAG: ${{ steps.release.outputs.tag }}
+          MIRROR_EXISTING: ${{ github.event.inputs.mirror_existing_ghcr }}
         shell: bash
         run: |
           set -euo pipefail
@@ -59,6 +66,7 @@ jobs:
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io' EXIT
           ready=false
+          source_ready=false
           if docker pull --platform linux/amd64 "$image:stable"; then
             source_sha=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image:stable")
             recipe_sha=$(docker inspect -f '{{ index .Config.Labels "io.folderframe.deployment-revision" }}' "$image:stable")
@@ -70,13 +78,22 @@ jobs:
             else
               platforms_ready=false
             fi
-            if [[ "$source_sha" == "$APP_SHA" && "$recipe_sha" == "$GITHUB_SHA" && "$version" == "$APP_TAG" && "$platforms_ready" == true ]]; then
-              ready=true
+            if [[ "$source_sha" == "$APP_SHA" && -n "$recipe_sha" && "$version" == "$APP_TAG" && "$platforms_ready" == true ]]; then
+              source_ready=true
+              if [[ "$recipe_sha" == "$GITHUB_SHA" ]]; then
+                ready=true
+              fi
             fi
           fi
+          build_required=true
+          if [[ "$ready" == true || ("$MIRROR_EXISTING" == true && "$source_ready" == true) ]]; then
+            build_required=false
+          fi
           echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          echo "source_ready=$source_ready" >> "$GITHUB_OUTPUT"
+          echo "build_required=$build_required" >> "$GITHUB_OUTPUT"
       - name: Fetch app from the release commit
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: The-Grog/FolderFrame
@@ -84,15 +101,15 @@ jobs:
           path: upstream
           persist-credentials: false
       - name: Set up QEMU
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
         with:
           platforms: arm64
       - name: Set up Docker Buildx
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Log in to GHCR for candidate publication
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -101,7 +118,7 @@ jobs:
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Prepare lowercase candidate references
         id: candidate_refs
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -111,7 +128,7 @@ jobs:
           echo "arm64=$stem-arm64" >> "$GITHUB_OUTPUT"
       - name: Build immutable amd64 candidate
         id: build_amd64
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
@@ -128,7 +145,7 @@ jobs:
           cache-from: type=gha,scope=folderframe-smoke-amd64
           cache-to: type=gha,mode=max,scope=folderframe-smoke-amd64
       - name: Smoke-test immutable amd64 candidate
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         env:
           APP_SHA: ${{ steps.release.outputs.sha }}
           CANDIDATE_DIGEST: ${{ steps.build_amd64.outputs.digest }}
@@ -140,7 +157,7 @@ jobs:
           scripts/smoke_container.sh "$image" linux/amd64 x86_64 "$APP_SHA"
       - name: Build immutable arm64 candidate
         id: build_arm64
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
@@ -157,7 +174,7 @@ jobs:
           cache-from: type=gha,scope=folderframe-smoke-arm64
           cache-to: type=gha,mode=max,scope=folderframe-smoke-arm64
       - name: Smoke-test immutable arm64 candidate
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         env:
           APP_SHA: ${{ steps.release.outputs.sha }}
           CANDIDATE_DIGEST: ${{ steps.build_arm64.outputs.digest }}
@@ -169,7 +186,7 @@ jobs:
           scripts/smoke_container.sh "$image" linux/arm64 aarch64 "$APP_SHA"
       - name: Assemble and verify candidate image index
         id: candidate
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         env:
           AMD64_DIGEST: ${{ steps.build_amd64.outputs.digest }}
           ARM64_DIGEST: ${{ steps.build_arm64.outputs.digest }}
@@ -187,7 +204,7 @@ jobs:
           test -n "$digest"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Promote verified candidate to release tags
-        if: steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         env:
           APP_SHA: ${{ steps.release.outputs.sha }}
           APP_TAG: ${{ steps.release.outputs.tag }}
@@ -207,5 +224,87 @@ jobs:
             test "$digest" = "$CANDIDATE_DIGEST"
           done
       - name: Log out of GHCR
-        if: always() && steps.release.outputs.available == 'true' && steps.existing.outputs.ready != 'true'
+        if: always() && steps.release.outputs.available == 'true' && steps.existing.outputs.build_required == 'true'
         run: docker logout ghcr.io
+      - name: Mirror verified GHCR release to Docker Hub
+        if: steps.release.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          APP_SHA: ${{ steps.release.outputs.sha }}
+          APP_TAG: ${{ steps.release.outputs.tag }}
+          MIRROR_EXISTING: ${{ github.event.inputs.mirror_existing_ghcr }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DOCKERHUB_USERNAME"
+          test -n "$DOCKERHUB_TOKEN"
+          ghcr_image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          dockerhub_image="docker.io/${DOCKERHUB_USERNAME}/folderframe"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+          trap 'docker logout ghcr.io; docker logout docker.io' EXIT
+
+          source_ref="$ghcr_image:stable"
+          source_raw=$(mktemp)
+          docker buildx imagetools inspect --raw "$source_ref" > "$source_raw"
+          python3 scripts/verify_image_index.py "$source_raw"
+          source_digest=$(docker buildx imagetools inspect "$source_ref" | awk '/^Digest:/ { print $2; exit }')
+          test -n "$source_digest"
+
+          docker pull --platform linux/amd64 "$ghcr_image@$source_digest"
+          source_sha=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$ghcr_image@$source_digest")
+          recipe_sha=$(docker inspect -f '{{ index .Config.Labels "io.folderframe.deployment-revision" }}' "$ghcr_image@$source_digest")
+          version=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$ghcr_image@$source_digest")
+          test "$source_sha" = "$APP_SHA"
+          test "$version" = "$APP_TAG"
+          test -n "$recipe_sha"
+          if [[ "$MIRROR_EXISTING" != true ]]; then
+            test "$recipe_sha" = "$GITHUB_SHA"
+          fi
+
+          docker buildx imagetools create \
+            --tag "$dockerhub_image:latest" \
+            --tag "$dockerhub_image:stable" \
+            --tag "$dockerhub_image:$APP_TAG" \
+            "$ghcr_image@$source_digest"
+
+          mirrored_digest=""
+          for tag in latest stable "$APP_TAG"; do
+            ref="$dockerhub_image:$tag"
+            destination_raw=$(mktemp)
+            docker buildx imagetools inspect --raw "$ref" > "$destination_raw"
+            python3 scripts/verify_image_index.py "$destination_raw"
+            python3 - "$source_raw" "$destination_raw" <<'PY'
+          import json
+          import sys
+
+          def platform_digests(path):
+              payload = json.load(open(path, encoding="utf-8"))
+              return {
+                  (entry["platform"]["os"], entry["platform"]["architecture"]): entry["digest"]
+                  for entry in payload["manifests"]
+                  if entry.get("platform", {}).get("os") == "linux"
+                  and entry.get("platform", {}).get("architecture") in {"amd64", "arm64"}
+              }
+
+          if platform_digests(sys.argv[1]) != platform_digests(sys.argv[2]):
+              raise SystemExit("Docker Hub does not reference the verified GHCR platform manifests")
+          PY
+            digest=$(docker buildx imagetools inspect "$ref" | awk '/^Digest:/ { print $2; exit }')
+            test -n "$digest"
+            if [[ -z "$mirrored_digest" ]]; then
+              mirrored_digest="$digest"
+            else
+              test "$digest" = "$mirrored_digest"
+            fi
+          done
+
+          docker pull --platform linux/amd64 "$dockerhub_image@$mirrored_digest"
+          mirrored_sha=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$dockerhub_image@$mirrored_digest")
+          mirrored_recipe=$(docker inspect -f '{{ index .Config.Labels "io.folderframe.deployment-revision" }}' "$dockerhub_image@$mirrored_digest")
+          mirrored_version=$(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$dockerhub_image@$mirrored_digest")
+          test "$mirrored_sha" = "$APP_SHA"
+          test "$mirrored_recipe" = "$recipe_sha"
+          test "$mirrored_version" = "$APP_TAG"

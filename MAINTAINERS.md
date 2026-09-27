@@ -9,7 +9,7 @@ This document is for maintainers of the canonical FolderFrame deployment reposit
 3. Commit and push the reviewed deployment recipe, then manually dispatch
    **Publish release image** and complete the `container-publish` approval.
    Scheduled, push, and pull-request runs validate only; they do not publish.
-4. Confirm resolver tests, image smoke tests, and GHCR publication succeed.
+4. Confirm resolver tests, image smoke tests, GHCR publication, and Docker Hub mirroring succeed.
    The smoke test must generate and serve a WebP and persistent manifest from a read-only media mount.
 5. Confirm the version tag and `stable` resolve to the expected image digest.
 6. Update release notes and user-facing documentation when configuration changes.
@@ -51,6 +51,25 @@ A 64-bit operating system is required for ARM64 Raspberry Pi use. `linux/arm/v7`
 remains unsupported. Native ARM hardware performance and browser playback remain
 open validation; QEMU smoke tests are not device validation. Publishing an image
 does not authorize updating or restarting the production container.
+
+## Docker Hub mirror
+
+`docker.io/thegrog/folderframe` is an additional public mirror. The protected
+`container-publish` environment supplies `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN`; credentials must never enter the repository. After GHCR has a
+verified `stable` index, the workflow copies that exact index to Docker Hub as
+`latest`, `stable`, and the resolved application tag. It verifies every Docker Hub
+tag has both required platforms, references the verified GHCR platform manifests,
+and retains the expected AMD64 OCI labels. Candidate, build, and test tags remain
+GHCR-only.
+
+The mirror step runs even when the existing GHCR release and recipe make a rebuild
+unnecessary. To bootstrap a new Docker Hub repository, manually dispatch the
+workflow with **Mirror an already verified matching GHCR stable image without
+rebuilding it** selected. It only skips the build when GHCR `stable` has the
+resolved app revision, version, and both verified platforms. A Docker Hub failure
+fails the manually authorized publication; it must not be reported as mirrored.
+
 ## Build inputs
 
 The workflow resolves the latest stable FolderFrame release to an immutable commit, checks it out as `upstream`, and lets Docker access only files allowlisted in `.dockerignore`. Never replace the explicit copies with `COPY .` or copy the whole application repository.

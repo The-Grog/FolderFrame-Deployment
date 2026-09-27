@@ -20,6 +20,22 @@ docker run -d \
 
 Open `http://SERVER-IP:8088/`. Change the host port if 8088 is already in use.
 
+## Docker Hub mirror
+
+FolderFrame is also published to [Docker Hub](https://hub.docker.com/r/thegrog/folderframe)
+after the same multi-platform image has passed the GHCR release checks. GHCR remains
+the canonical image source for the Unraid Community Apps template and existing
+installations.
+
+```sh
+docker pull thegrog/folderframe:stable
+docker pull thegrog/folderframe:latest
+```
+
+`stable` and `latest` both follow the latest verified stable FolderFrame release.
+Docker Hub also receives the matching `vX.Y.Z` application-version tag. Internal
+candidate, build, and test tags remain in GHCR only.
+
 ### Multiple media folders
 
 Mount every host directory at a unique sibling path below an otherwise unmounted `/media` parent.
