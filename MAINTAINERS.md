@@ -39,14 +39,14 @@ release.
 
 Most recently verified publication:
 
-- Core release: `v0.8.5` at `4364760611da03a483b23019bdc9cb857150a155`.
-- Deployment recipe used to build the image: `e67b057878b25f670f1f8c776e77e9e9ea04f1d9`.
-- Workflow: [Publish release image #36381799934](https://github.com/The-Grog/FolderFrame-Deployment/actions/runs/36381799934).
-- Verified GHCR and Docker Hub multi-platform index: `sha256:f8310b317de2124d28d71784e14eb9366f6042c62d5080d64f9118e6e720a04c`.
+- Core release: `v0.8.6` at `5b284132d87ffbc7c9aaeae7f94d0044d70c1ecb`.
+- Deployment recipe used to build the image: `9009656e833a609b918c379f18d710a1bb0544f1`.
+- Workflow: [Publish release image #36466761373](https://github.com/The-Grog/FolderFrame-Deployment/actions/runs/36466761373).
+- Verified GHCR and Docker Hub multi-platform index: `sha256:bfd43c100e2a715bbb1d48e8e73eaf5db67b94a512328f5971358b4ec146384b`.
 - Immutable `linux/amd64` and `linux/arm64` candidates passed smoke tests before
-  the index was assembled and promoted to `build-4364760611da-e67b057878b2`,
-  `v0.8.5`, `test`, and `stable` on GHCR; Docker Hub mirrors the verified index
-  as `v0.8.5`, `stable`, and `latest`.
+  the index was assembled and promoted to `build-5b284132d87f-9009656e833a`,
+  `v0.8.6`, `test`, and `stable` on GHCR; Docker Hub mirrors the verified index
+  as `v0.8.6`, `stable`, and `latest`.
 
 A 64-bit operating system is required for ARM64 Raspberry Pi use. `linux/arm/v7`
 remains unsupported. Native ARM hardware performance and browser playback remain
