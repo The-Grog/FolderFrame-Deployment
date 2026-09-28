@@ -67,17 +67,33 @@ def write_status(path: Path | None, payload: dict) -> None:
         log(f"could not update worker status: {error}")
 
 def status_summary(status: dict) -> str:
-    prefix = "scan complete with preview warnings" if status.get("outcome") == "complete_with_warnings" else "scan complete"
+    prefix = "scan complete with warnings" if status.get("outcome") == "complete_with_warnings" else "scan complete"
     parts = []
     if status.get("mediaFiles") is not None:
         parts.append(f"{status['mediaFiles']} media files")
-    parts.extend([
-        f"{status.get('thumbnailsGenerated', 0)} thumbnails generated",
-        f"{status.get('previewFailures', 0)} preview failures",
-        f"{status.get('unchangedFailuresSkipped', 0)} unchanged failures skipped",
-        f"{status.get('metadataExtracted', 0)} metadata records extracted",
-        f"{status.get('metadataWarnings', 0)} metadata warnings",
-    ])
+    for key, label in (
+        ("thumbnailsGenerated", "thumbnails generated"),
+        ("thumbnailsCurrent", "thumbnails reused"),
+        ("thumbnailsPruned", "thumbnails pruned"),
+        ("metadataExtracted", "metadata records extracted"),
+        ("metadataReused", "metadata records reused"),
+    ):
+        if status.get(key, 0) > 0:
+            parts.append(f"{status[key]} {label}")
+    warnings = []
+    for key, label in (
+        ("previewFailures", "new preview failures"),
+        ("unchangedFailuresSkipped", "previously failed thumbnails skipped"),
+        ("thumbnailPruneWarnings", "thumbnail cleanup warnings"),
+        ("metadataWarnings", "metadata warnings"),
+        ("manifestErrors", "manifest errors"),
+    ):
+        if status.get(key, 0) > 0:
+            warnings.append(f"{status[key]} {label}")
+    if status.get("outcome") == "complete_with_warnings" and not warnings:
+        warnings.append("warnings without detailed counts; check worker logs")
+    if warnings:
+        parts.append(f"warnings: {', '.join(warnings)}")
     return f"{prefix} — {' · '.join(parts)}"
 
 def helper_command(helper: Path, media_root: Path, thumbnail_root: Path,

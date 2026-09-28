@@ -109,10 +109,37 @@ class MediaWorkerTests(unittest.TestCase):
             output = io.StringIO()
             with mock.patch.object(WORKER.subprocess, "run", side_effect=helper), contextlib.redirect_stdout(output):
                 self.assertTrue(WORKER.run_once(["helper"], None, status_path))
-            self.assertIn("scan complete with preview warnings", output.getvalue())
+            self.assertIn("scan complete with warnings", output.getvalue())
             self.assertIn("10248 media files", output.getvalue())
-            self.assertIn("3 preview failures", output.getvalue())
+            self.assertIn("3 new preview failures", output.getvalue())
+            self.assertIn("8 previously failed thumbnails skipped", output.getvalue())
             self.assertNotIn("scan failed", output.getvalue())
+
+    def test_status_summary_names_each_positive_warning_category(self):
+        summary = WORKER.status_summary({
+            "outcome": "complete_with_warnings",
+            "mediaFiles": 16249,
+            "thumbnailsGenerated": 0,
+            "thumbnailsCurrent": 13940,
+            "previewFailures": 2,
+            "unchangedFailuresSkipped": 543,
+            "thumbnailPruneWarnings": 4,
+            "metadataWarnings": 3,
+            "manifestErrors": 0,
+            "metadataReused": 14483,
+        })
+        self.assertIn("scan complete with warnings", summary)
+        self.assertIn("13940 thumbnails reused", summary)
+        self.assertIn("14483 metadata records reused", summary)
+        self.assertIn("2 new preview failures", summary)
+        self.assertIn("543 previously failed thumbnails skipped", summary)
+        self.assertIn("4 thumbnail cleanup warnings", summary)
+        self.assertIn("3 metadata warnings", summary)
+        self.assertNotIn("manifest errors", summary)
+
+    def test_status_summary_preserves_warning_without_known_counts(self):
+        summary = WORKER.status_summary({"outcome": "complete_with_warnings", "mediaFiles": 1})
+        self.assertIn("warnings without detailed counts; check worker logs", summary)
 
     def test_helper_failure_writes_failed_status(self):
         with tempfile.TemporaryDirectory() as directory:

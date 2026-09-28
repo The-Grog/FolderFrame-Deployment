@@ -210,6 +210,9 @@ helper atomically publishes its replacement; completion then replaces the
 running status with the detailed final result. The worker log summarizes media
 files, generated previews, new preview failures, and unchanged failures
 skipped. Only scanner/helper or manifest failures report `scan failed`.
+Warning summaries distinguish new preview failures, unchanged cached failures
+that were skipped, metadata warnings, and thumbnail-cleanup warnings. Cached
+preview failures are retried when the source signature changes.
 The container serves only this status file at
 `/folderframe-data/worker-status.json` and adds that path to its generated
 browser configuration whenever the worker is enabled. FolderFrame polls it to
