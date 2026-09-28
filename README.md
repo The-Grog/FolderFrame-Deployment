@@ -210,6 +210,12 @@ helper atomically publishes its replacement; completion then replaces the
 running status with the detailed final result. The worker log summarizes media
 files, generated previews, new preview failures, and unchanged failures
 skipped. Only scanner/helper or manifest failures report `scan failed`.
+The container serves only this status file at
+`/folderframe-data/worker-status.json` and adds that path to its generated
+browser configuration whenever the worker is enabled. FolderFrame polls it to
+show a compact update indicator. The existing manifest stays usable while a
+scan runs or fails; a completed status offers an explicit browser-side Reload
+Library action and never starts a server scan.
 
 Successful preview signatures are stored separately in
 `/config/folderframe-data/thumbnail-cache.json` (override with
@@ -246,8 +252,9 @@ Advanced overrides are `FOLDERFRAME_MEDIA_PATH`,
 `FOLDERFRAME_THUMBNAIL_FAILURE_CACHE_PATH`, and
 `FOLDERFRAME_WORKER_STATUS_PATH`. Keep the
 manifest filename `library.json`; public access is deliberately limited to
-`/folderframe-data/library.json`, `/folderframe-data/library.d/*.json`, and
-`/folderframe-data/exif.d/*.json`, and the thumbnail route. Internal dotfiles,
+`/folderframe-data/library.json`, `/folderframe-data/library.d/*.json`,
+`/folderframe-data/exif.d/*.json`, `/folderframe-data/worker-status.json`, and
+the thumbnail route. Internal caches and dotfiles,
 including the EXIF extraction cache, are not served.
 
 ## Supported architectures

@@ -35,6 +35,14 @@
 		file_server
 	}
 
+	# Serve only the public worker status file; internal caches remain inaccessible.
+	handle /folderframe-data/worker-status.json {
+		rewrite * /worker-status.json
+		root * {$FOLDERFRAME_MANIFEST_ROOT:/config/folderframe-data}
+		header Cache-Control "no-store"
+		file_server
+	}
+
 	# Serve only the manifest index and its generated chunk files from appdata.
 	handle /folderframe-data/library.json {
 		rewrite * /library.json

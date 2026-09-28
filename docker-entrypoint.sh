@@ -178,6 +178,16 @@ jq \
             end
         )
       end
+    | if ($thumbnail_generation == "true" or $manifest_generation == "true") then
+        .sources |= map(
+            if ((.path | type) == "string" and (.path | startswith("photos/")))
+            then .workerStatusPath = "folderframe-data/worker-status.json"
+            else .
+            end
+        )
+      else
+        .sources |= map(del(.workerStatusPath))
+      end
     ' "$persistent_config" > "$temp_config"
 
 chmod 0644 "$persistent_config" "$temp_config"

@@ -120,6 +120,7 @@ c = json.load(open("/run/folderframe/folderframe.config.json", encoding="utf-8")
 assert c["sources"][0]["label"] == "Gallery"
 assert c["sources"][0]["thumbnailPath"] == "thumbnails/"
 assert c["sources"][0]["manifestPath"] == "folderframe-data/library.json"
+assert c["sources"][0]["workerStatusPath"] == "folderframe-data/worker-status.json"
 assert c["defaults"]["gridDensity"] == "comfortable"
 expected = {
     "view": "all", "sort": "oldest", "interval": 10,
@@ -144,6 +145,7 @@ test -s "$config/thumbnails/Library/library.heic.webp"
 test -s "$config/thumbnails/Archive/archive.png.webp"
 test -s "$config/folderframe-data/exif.d/Library/library.jpg.json"
 test -s "$config/folderframe-data/library.json"
+curl --fail "$base/folderframe-data/worker-status.json" -o "$work/worker-status.json"
 docker exec -i "$name" python3 - <<'PY'
 import json
 from pathlib import Path
@@ -162,6 +164,12 @@ for descriptor in m["chunks"].values():
         records.update({record["path"]: record for record in directory["files"]})
 assert {"Archive/archive.png", "Archive/fallback.mov", "Library/library.jpg", "Library/library.heic"} <= set(records)
 assert records["Library/library.jpg"]["exifPath"] == "exif.d/Library/library.jpg.json"
+PY
+python3 - "$work/worker-status.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1], encoding="utf-8"))
+assert s["version"] == 1
+assert s["outcome"] in {"complete", "complete_with_warnings"}
 PY
 
 jpg_thumb_before=$(stat -c %Y "$config/thumbnails/Library/library.jpg.webp")
@@ -217,6 +225,6 @@ if docker run --rm --platform "$platform" -e FOLDERFRAME_THUMBNAIL_INTERVAL=inva
   echo 'invalid thumbnail interval unexpectedly succeeded' >&2
   exit 1
 fi
-for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile folderframe-data/secret.txt config/folderframe.config.json; do
+for path in .git/config MONETIZATION.md TODO_PRIVATE.md Dockerfile Caddyfile folderframe-data/secret.txt folderframe-data/thumbnail-cache.json folderframe-data/thumbnail-failures.json config/folderframe.config.json; do
   test "$(curl -s -o /dev/null -w '%{http_code}' "$base/$path")" = 404
 done
