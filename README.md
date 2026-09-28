@@ -202,7 +202,7 @@ Thumbnail failures are stored in
 `/config/folderframe-data/thumbnail-failures.json`, keyed by relative path,
 size, and modification time. Unchanged failures are skipped on later scans;
 changed or replaced sources are retried. A few failed previews produce a
-`scan complete with preview warnings` result instead of failing an otherwise
+`scan complete with warnings` result instead of failing an otherwise
 valid manifest scan. The latest structured result is stored in
 `/config/folderframe-data/worker-status.json`: it reports `outcome: "running"`
 while a scan is active. The previous valid manifest remains usable until the
@@ -210,8 +210,9 @@ helper atomically publishes its replacement; completion then replaces the
 running status with the detailed final result. The worker log summarizes media
 files, generated previews, new preview failures, and unchanged failures
 skipped. Only scanner/helper or manifest failures report `scan failed`.
-Warning summaries distinguish new preview failures, unchanged cached failures
-that were skipped, metadata warnings, and thumbnail-cleanup warnings. Cached
+Warnings describe operations that failed during the current scan. Unchanged
+files skipped from the preview-failure cache are informational: the scan can
+complete cleanly even though those previews may remain unavailable. Cached
 preview failures are retried when the source signature changes.
 The container serves only this status file at
 `/folderframe-data/worker-status.json` and adds that path to its generated
@@ -230,6 +231,9 @@ The first upgraded scan may reconcile previews that lack trusted signatures.
 
 JPEG, PNG, WebP, GIF, HEIC, and HEIF thumbnails are supported through Pillow
 and pillow-heif. Videos are indexed but do not receive generated thumbnails.
+The image's pinned FFmpeg package also supplies `ffprobe`; compatible core
+releases use it to publish optional MP4, MOV, WEBM, and M4V durations for grid
+badges. Failed optional duration reads do not fail or warn the worker scan.
 Original media is never modified.
 
 When supported image EXIF exists, the same worker also writes allowlisted

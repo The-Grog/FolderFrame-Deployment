@@ -112,7 +112,7 @@ class MediaWorkerTests(unittest.TestCase):
             self.assertIn("scan complete with warnings", output.getvalue())
             self.assertIn("10248 media files", output.getvalue())
             self.assertIn("3 new preview failures", output.getvalue())
-            self.assertIn("8 previously failed thumbnails skipped", output.getvalue())
+            self.assertIn("8 previously unavailable previews skipped", output.getvalue())
             self.assertNotIn("scan failed", output.getvalue())
 
     def test_status_summary_names_each_positive_warning_category(self):
@@ -132,7 +132,7 @@ class MediaWorkerTests(unittest.TestCase):
         self.assertIn("13940 thumbnails reused", summary)
         self.assertIn("14483 metadata records reused", summary)
         self.assertIn("2 new preview failures", summary)
-        self.assertIn("543 previously failed thumbnails skipped", summary)
+        self.assertIn("543 previously unavailable previews skipped", summary)
         self.assertIn("4 thumbnail cleanup warnings", summary)
         self.assertIn("3 metadata warnings", summary)
         self.assertNotIn("manifest errors", summary)
@@ -140,6 +140,36 @@ class MediaWorkerTests(unittest.TestCase):
     def test_status_summary_preserves_warning_without_known_counts(self):
         summary = WORKER.status_summary({"outcome": "complete_with_warnings", "mediaFiles": 1})
         self.assertIn("warnings without detailed counts; check worker logs", summary)
+
+    def test_legacy_cached_only_warning_is_neutral_only_with_explicit_zero_counters(self):
+        cached_only = {
+            "outcome": "complete_with_warnings", "mediaFiles": 16249,
+            "thumbnailsCurrent": 13940, "thumbnailsPruned": 0,
+            "metadataReused": 14483, "unchangedFailuresSkipped": 543,
+            "previewFailures": 0, "thumbnailPruneWarnings": 0,
+            "metadataWarnings": 0, "manifestErrors": 0,
+        }
+        summary = WORKER.status_summary(cached_only)
+        self.assertTrue(summary.startswith("scan complete —"), summary)
+        self.assertNotIn("warnings:", summary)
+        self.assertIn("543 previously unavailable previews skipped", summary)
+
+        incomplete = dict(cached_only)
+        incomplete.pop("metadataWarnings")
+        self.assertIn("scan complete with warnings", WORKER.status_summary(incomplete))
+        invalid = dict(cached_only, previewFailures="0")
+        self.assertIn("scan complete with warnings", WORKER.status_summary(invalid))
+
+    def test_clean_reuse_and_pruning_are_informational(self):
+        summary = WORKER.status_summary({
+            "outcome": "complete", "mediaFiles": 10, "thumbnailsCurrent": 9,
+            "thumbnailsPruned": 2, "metadataReused": 10,
+            "previewFailures": 0, "unchangedFailuresSkipped": 0,
+            "thumbnailPruneWarnings": 0, "metadataWarnings": 0, "manifestErrors": 0,
+        })
+        self.assertTrue(summary.startswith("scan complete —"), summary)
+        self.assertNotIn("warnings:", summary)
+        self.assertIn("2 thumbnails pruned", summary)
 
     def test_helper_failure_writes_failed_status(self):
         with tempfile.TemporaryDirectory() as directory:

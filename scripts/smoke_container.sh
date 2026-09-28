@@ -81,6 +81,7 @@ docker run -d --name "$name" --platform "$platform" -p 127.0.0.1::8080 \
 
 machine=$(docker exec "$name" uname -m)
 test "$machine" = "$expected_machine"
+docker exec "$name" sh -c 'command -v ffprobe >/dev/null && ffprobe -version >/dev/null'
 docker exec -i "$name" python3 - <<'PY'
 from PIL import Image, features
 import pillow_heif

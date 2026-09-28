@@ -66,8 +66,33 @@ def write_status(path: Path | None, payload: dict) -> None:
     except OSError as error:
         log(f"could not update worker status: {error}")
 
+CURRENT_FAILURE_COUNTERS = (
+    "previewFailures", "thumbnailPruneWarnings", "metadataWarnings", "manifestErrors",
+)
+
+def status_counter(status: dict, key: str):
+    value = status.get(key)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+def classify_status_outcome(status: dict) -> str:
+    outcome = status.get("outcome")
+    if outcome in {"failed", "running"}:
+        return outcome
+    if any((status_counter(status, key) or 0) > 0 for key in CURRENT_FAILURE_COUNTERS):
+        return "complete_with_warnings"
+    explicit_zeros = all(status_counter(status, key) == 0 for key in CURRENT_FAILURE_COUNTERS)
+    skipped = status_counter(status, "unchangedFailuresSkipped")
+    if outcome == "complete_with_warnings" and skipped is not None and skipped > 0 and explicit_zeros:
+        return "complete"
+    return outcome
+
 def status_summary(status: dict) -> str:
-    prefix = "scan complete with warnings" if status.get("outcome") == "complete_with_warnings" else "scan complete"
+    effective_outcome = classify_status_outcome(status)
+    prefix = {
+        "complete_with_warnings": "scan complete with warnings",
+        "failed": "scan failed",
+        "running": "scan running",
+    }.get(effective_outcome, "scan complete")
     parts = []
     if status.get("mediaFiles") is not None:
         parts.append(f"{status['mediaFiles']} media files")
@@ -78,19 +103,23 @@ def status_summary(status: dict) -> str:
         ("metadataExtracted", "metadata records extracted"),
         ("metadataReused", "metadata records reused"),
     ):
-        if status.get(key, 0) > 0:
-            parts.append(f"{status[key]} {label}")
+        value = status_counter(status, key)
+        if value is not None and value > 0:
+            parts.append(f"{value} {label}")
+    skipped = status_counter(status, "unchangedFailuresSkipped")
+    if skipped is not None and skipped > 0:
+        parts.append(f"{skipped} previously unavailable previews skipped")
     warnings = []
     for key, label in (
         ("previewFailures", "new preview failures"),
-        ("unchangedFailuresSkipped", "previously failed thumbnails skipped"),
         ("thumbnailPruneWarnings", "thumbnail cleanup warnings"),
         ("metadataWarnings", "metadata warnings"),
         ("manifestErrors", "manifest errors"),
     ):
-        if status.get(key, 0) > 0:
-            warnings.append(f"{status[key]} {label}")
-    if status.get("outcome") == "complete_with_warnings" and not warnings:
+        value = status_counter(status, key)
+        if value is not None and value > 0:
+            warnings.append(f"{value} {label}")
+    if effective_outcome == "complete_with_warnings" and not warnings:
         warnings.append("warnings without detailed counts; check worker logs")
     if warnings:
         parts.append(f"warnings: {', '.join(warnings)}")
