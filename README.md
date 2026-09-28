@@ -259,11 +259,11 @@ including the EXIF extraction cache, are not served.
 
 ## Supported architectures
 
-FolderFrame `v0.8.3` is published as a verified multi-platform image index for
-`linux/amd64` and `linux/arm64`. Its digest is
-`sha256:387e5723778e06540f4d10d7278c98747f81dbe72f349b2ddd799d4c81914830`.
-It was built from core revision `2b098094b9ab4d2d024d6c3c5d3263cb7e2b91a6` and deployment revision
-`110b8fa130c688f79557bc1a991ce80d35e9e8fe`. Docker automatically selects the matching image for the host.
+FolderFrame `v0.8.4` is published as a verified multi-platform image index for
+`linux/amd64` and `linux/arm64`. Its GHCR and Docker Hub digest is
+`sha256:74c94c7f7c8faa52eb800d81492b20da2801d8707120c4f59a94576a46370c6e`.
+It was built from core revision `ef21ec7036b120995b754f1453e36d4c29af5d99` and deployment revision
+`d181e7b620f52d59513b9337b0b367e3d6299262`. Docker automatically selects the matching image for the host.
 A Raspberry Pi requires a 64-bit operating system and an ARM64-capable model;
 `linux/arm/v7` and other 32-bit Pi installations are not supported by this image.
 Native ARM hardware performance and browser playback validation remain open.
