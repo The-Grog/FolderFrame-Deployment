@@ -1,4 +1,4 @@
-FROM caddy:2-alpine@sha256:de23def33b17fb5d1290b0f6c2add1d70780e52341896c00a4c8a2a2fe9d355e
+FROM caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
 ARG FFMPEG_VERSION=8.0.1-r1
 
 # upstream is checked out at the published release's immutable commit.
