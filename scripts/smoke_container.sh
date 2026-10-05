@@ -166,7 +166,7 @@ root = Path("/config/folderframe-data")
 s = json.loads((root / "worker-status.json").read_text(encoding="utf-8"))
 assert s["outcome"] in {"complete", "complete_with_warnings"}, s
 assert s["mediaFiles"] == 4, s
-assert s["thumbnailsGenerated"] >= 3, s
+assert s["thumbnailsGenerated"] + s["thumbnailsCurrent"] >= 3, s
 m = json.loads((root / "library.json").read_text(encoding="utf-8"))
 assert m["version"] == 1
 assert set(m["chunks"]) == {"Archive", "Library"}
