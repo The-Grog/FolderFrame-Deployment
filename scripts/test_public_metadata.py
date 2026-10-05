@@ -38,6 +38,9 @@ UNRAID_OVERRIDES = {
     "Embed Refresh Interval": "FOLDERFRAME_EMBED_REFRESH_INTERVAL",
     "Remember Browser Preferences": "FOLDERFRAME_REMEMBER_PREFERENCES",
 }
+WORKER_OVERRIDES = {
+    "Manual Refresh": ("FOLDERFRAME_MANUAL_REFRESH", "true"),
+}
 THUMBNAIL_OVERRIDES = {
     "Generate Thumbnails": ("FOLDERFRAME_THUMBNAILS", "true"),
     "Persistent Media Manifest": ("FOLDERFRAME_MANIFEST", "true"),
@@ -81,13 +84,18 @@ class PublicMetadataTests(unittest.TestCase):
         actual = {
             name: attrs["Target"]
             for name, attrs in configs.items()
-            if attrs["Type"] == "Variable" and name not in THUMBNAIL_OVERRIDES and name not in TRANSCODE_OVERRIDES
+            if attrs["Type"] == "Variable" and name not in WORKER_OVERRIDES and name not in THUMBNAIL_OVERRIDES and name not in TRANSCODE_OVERRIDES
         }
         self.assertEqual(actual, UNRAID_OVERRIDES)
         for name in UNRAID_OVERRIDES:
             with self.subTest(name=name):
                 self.assertEqual(configs[name]["Default"], "")
                 self.assertEqual(configs[name]["Required"], "false")
+        for name, (target, default) in WORKER_OVERRIDES.items():
+            with self.subTest(name=name):
+                self.assertEqual(configs[name]["Target"], target)
+                self.assertEqual(configs[name]["Default"], default)
+                self.assertEqual(configs[name]["Required"], "true")
         for name, (target, default) in THUMBNAIL_OVERRIDES.items():
             with self.subTest(name=name):
                 self.assertEqual(configs[name]["Target"], target)

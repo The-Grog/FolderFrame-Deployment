@@ -4,9 +4,13 @@ import asyncio
 import json
 import os
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
 import re
 import signal
 import stat
+from uuid import uuid4
+from refresh_control import request as request_refresh, status as refresh_status
 from urllib.parse import parse_qs, urlsplit
 
 
@@ -105,8 +109,11 @@ async def terminate(process):
 
 class TranscodeService:
     def __init__(self, root='/media', enabled=True, limit=2, threads=2,
-                 startup_timeout=20, stall_timeout=30, executable='ffmpeg'):
+                 startup_timeout=20, stall_timeout=30, executable='ffmpeg',
+                 refresh_enabled=True, refresh_path='/config/folderframe-data/refresh-request.json'):
         self.root, self.enabled, self.limit, self.threads = root, enabled, limit, threads
+        self.refresh_enabled = refresh_enabled
+        self.refresh_path = Path(refresh_path)
         self.startup_timeout, self.stall_timeout = startup_timeout, stall_timeout
         self.executable = executable
         self.active = 0
@@ -131,12 +138,49 @@ class TranscodeService:
             header = await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'), 5)
             if len(header) > 16384:
                 raise RequestError(431, 'Request too large')
-            method, target, version = header.split(b'\r\n', 1)[0].decode('ascii').split(' ')
-            if method != 'GET' or not target.startswith('/') or target.startswith('//'):
-                raise RequestError(405, 'GET required')
+            lines = header.decode('iso-8859-1').split('\r\n')
+            method, target, version = lines[0].split(' ')
+            headers = {}
+            for line in lines[1:]:
+                if not line:
+                    continue
+                name, separator, value = line.partition(':')
+                if not separator:
+                    raise RequestError(400, 'Invalid request')
+                headers[name.strip().lower()] = value.strip()
+            if not target.startswith('/') or target.startswith('//'):
+                raise RequestError(400, 'Invalid request')
             parsed = urlsplit(target)
+            if parsed.path == '/folderframe-api/refresh':
+                if not self.refresh_enabled:
+                    raise RequestError(404, 'Manual refresh is disabled')
+                if method == 'GET':
+                    query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True,
+                        encoding='utf-8', errors='strict')
+                    if set(query) != {'requestId'} or len(query['requestId']) != 1 or not re.fullmatch(r'[A-Za-z0-9_-]{8,128}', query['requestId'][0]):
+                        raise RequestError(400, 'One valid requestId is required')
+                    result = refresh_status(self.refresh_path, query['requestId'][0])
+                    if result is None:
+                        raise RequestError(404, 'Refresh request not found')
+                    await self.reply(writer, 200, result)
+                    return
+                if method != 'POST':
+                    raise RequestError(405, 'POST required')
+                host = headers.get('host', '')
+                proto = headers.get('x-forwarded-proto', 'http').split(',')[0].strip()
+                origin = headers.get('origin', '')
+                if not host or proto not in ('http', 'https') or origin != f'{proto}://{host}':
+                    raise RequestError(403, 'Same-origin request required')
+                request_id = headers.get('x-folderframe-request-id', '')
+                if not re.fullmatch(r'[A-Za-z0-9_-]{8,128}', request_id):
+                    request_id = uuid4().hex
+                accepted_id, coalesced = request_refresh(self.refresh_path, request_id)
+                await self.reply(writer, 202, {'accepted': True, 'requestId': accepted_id, 'coalesced': coalesced})
+                return
+            if method != 'GET':
+                raise RequestError(405, 'GET required')
             if parsed.path == '/folderframe-api/capabilities':
-                await self.reply(writer, 200, {'videoTranscode': self.enabled, 'mediaPath': '/photos/'})
+                await self.reply(writer, 200, {'videoTranscode': self.enabled, 'mediaPath': '/photos/', 'manualRefresh': self.refresh_enabled})
                 return
             if parsed.path != '/folderframe-api/transcode' or not self.enabled:
                 raise RequestError(404, 'Service unavailable')
@@ -258,9 +302,13 @@ async def main():
     enabled = os.environ.get('FOLDERFRAME_VIDEO_TRANSCODE', 'true')
     if enabled not in ('true', 'false'):
         raise ValueError('FOLDERFRAME_VIDEO_TRANSCODE must be true or false')
+    refresh_enabled = os.environ.get('FOLDERFRAME_MANUAL_REFRESH', 'true')
+    if refresh_enabled not in ('true', 'false'):
+        raise ValueError('FOLDERFRAME_MANUAL_REFRESH must be true or false')
     service = TranscodeService(enabled=enabled == 'true',
         limit=integer_setting('FOLDERFRAME_TRANSCODE_JOBS', 2, 8),
-        threads=integer_setting('FOLDERFRAME_TRANSCODE_THREADS', 2, 16))
+        threads=integer_setting('FOLDERFRAME_TRANSCODE_THREADS', 2, 16),
+        refresh_enabled=refresh_enabled == 'true')
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

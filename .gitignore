@@ -6,6 +6,7 @@
 !/docker-entrypoint.sh
 !/thumbnail_worker.py
 !/transcode_service.py
+!/refresh_control.py
 !/service_runner.py
 !/TRANSCODING.md
 !/README.md
@@ -37,6 +38,7 @@
 !/scripts/test_public_metadata.py
 !/scripts/test_thumbnail_worker.py
 !/scripts/test_transcode_service.py
+!/scripts/test_refresh_control.py
 !/scripts/test_multiarch_workflow.py
 !/scripts/verify_image_index.py
 !/scripts/smoke_container.sh

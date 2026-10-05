@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('transcode_service', ROOT / 'transcode_service.py')
 api = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(api)
+import refresh_control
 
 
 @unittest.skipUnless(os.name == 'posix' and Path('/proc/self/fd').exists(), 'Linux descriptor containment required')
@@ -202,6 +203,75 @@ class StreamingTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.service.active, 0)
             self.assertFalse(self.service.processes)
             self.assertTrue(all(p.returncode is not None for p in processes))
+
+
+class RefreshEndpointTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.request_path = Path(self.temp.name) / 'refresh.json'
+        self.service = api.TranscodeService(refresh_path=self.request_path)
+        self.server = await asyncio.start_server(self.service.handle, '127.0.0.1', 0)
+        self.port = self.server.sockets[0].getsockname()[1]
+
+    async def asyncTearDown(self):
+        self.server.close()
+        await self.server.wait_closed()
+        await self.service.close()
+        self.temp.cleanup()
+
+    async def request(self, method='POST', origin='http://localhost', request_id='request_one', target='/folderframe-api/refresh'):
+        reader, writer = await asyncio.open_connection('127.0.0.1', self.port)
+        request = (f'{method} {target} HTTP/1.1\r\nHost: localhost\r\n'
+                   f'Origin: {origin}\r\nX-FolderFrame-Request-ID: {request_id}\r\n\r\n')
+        writer.write(request.encode())
+        await writer.drain()
+        result = await reader.read()
+        writer.close()
+        await writer.wait_closed()
+        return result
+
+    async def test_post_only_same_origin_and_coalesced(self):
+        self.assertIn(b'400', await self.request(method='GET'))
+        self.assertFalse(self.request_path.exists())
+        self.assertIn(b'403', await self.request(origin='https://evil.test'))
+        self.assertFalse(self.request_path.exists())
+        accepted = await self.request()
+        self.assertIn(b'202', accepted)
+        self.assertIn(b'"requestId": "request_one"', accepted)
+        queued = await self.request(method='GET', target='/folderframe-api/refresh?requestId=request_one')
+        self.assertIn(b'"state": "queued"', queued)
+        coalesced = await self.request(request_id='request_two')
+        self.assertIn(b'"requestId": "request_one"', coalesced)
+        self.assertIn(b'"coalesced": true', coalesced)
+
+    async def test_lost_coalesced_ack_resolves_through_original_client_id(self):
+        self.assertIn(b'202', await self.request(request_id='request_one'))
+        joined = await self.request(request_id='request_two')
+        self.assertIn(b'"requestId": "request_one"', joined)
+        active = refresh_control.claim(self.request_path)
+        retried = await self.request(request_id='request_two')
+        self.assertIn(b'"requestId": "request_one"', retried)
+        running = await self.request(method='GET', target='/folderframe-api/refresh?requestId=request_two')
+        self.assertIn(b'"requestId": "request_two"', running)
+        self.assertIn(b'"acceptedRequestId": "request_one"', running)
+        self.assertIn(b'"state": "running"', running)
+        refresh_control.finish(self.request_path, active['runId'], 'complete', '2026-10-04T12:00:00Z')
+        completed = await self.request(method='GET', target='/folderframe-api/refresh?requestId=request_two')
+        self.assertIn(b'"state": "complete"', completed)
+
+    async def test_completed_request_remains_queryable_after_a_follow_up_is_queued(self):
+        self.assertIn(b'202', await self.request(request_id='request_one'))
+        active = refresh_control.claim(self.request_path)
+        refresh_control.finish(self.request_path, active['runId'], 'complete', '2026-10-04T12:00:00Z')
+        self.assertIn(b'202', await self.request(request_id='request_two'))
+        completed = await self.request(method='GET', target='/folderframe-api/refresh?requestId=request_one')
+        self.assertIn(b'"state": "complete"', completed)
+        self.assertIn(b'"outcome": "complete"', completed)
+
+    async def test_disabled_endpoint_rejects_without_queueing(self):
+        self.service.refresh_enabled = False
+        self.assertIn(b'404', await self.request())
+        self.assertFalse(self.request_path.exists())
 
 
 if __name__ == '__main__':

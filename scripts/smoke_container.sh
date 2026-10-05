@@ -122,6 +122,7 @@ assert c["sources"][0]["label"] == "Gallery"
 assert c["sources"][0]["thumbnailPath"] == "thumbnails/"
 assert c["sources"][0]["manifestPath"] == "folderframe-data/library.json"
 assert c["sources"][0]["workerStatusPath"] == "folderframe-data/worker-status.json"
+assert c["sources"][0]["refreshPath"] == "folderframe-api/refresh"
 assert c["defaults"]["gridDensity"] == "comfortable"
 expected = {
     "view": "all", "sort": "oldest", "interval": 10,
@@ -147,6 +148,17 @@ test -s "$config/thumbnails/Archive/archive.png.webp"
 test -s "$config/folderframe-data/exif.d/Library/library.jpg.json"
 test -s "$config/folderframe-data/library.json"
 curl --fail "$base/folderframe-data/worker-status.json" -o "$work/worker-status.json"
+test "$(curl -s -o /dev/null -w '%{http_code}' "$base/folderframe-api/refresh")" = 405
+curl --fail -X POST -H "Origin: $base" -H 'X-FolderFrame-Request-ID: smoke_refresh' \
+  "$base/folderframe-api/refresh" -o "$work/refresh-ack.json"
+grep -q '"requestId": "smoke_refresh"' "$work/refresh-ack.json"
+for attempt in $(seq 1 90); do
+  if docker exec "$name" python3 -c 'import json; s=json.load(open("/config/folderframe-data/worker-status.json")); raise SystemExit(0 if s.get("requestId") == "smoke_refresh" and s.get("outcome") in {"complete", "complete_with_warnings"} else 1)' 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+docker exec "$name" python3 -c 'import json; s=json.load(open("/config/folderframe-data/worker-status.json")); assert s.get("requestId") == "smoke_refresh", s'
 docker exec -i "$name" python3 - <<'PY'
 import json
 from pathlib import Path

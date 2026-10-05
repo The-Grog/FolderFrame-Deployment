@@ -35,6 +35,7 @@ embed_refresh_interval=${FOLDERFRAME_EMBED_REFRESH_INTERVAL:-}
 remember_preferences=${FOLDERFRAME_REMEMBER_PREFERENCES:-}
 thumbnail_generation=${FOLDERFRAME_THUMBNAILS:-true}
 manifest_generation=${FOLDERFRAME_MANIFEST:-true}
+manual_refresh=${FOLDERFRAME_MANUAL_REFRESH:-true}
 thumbnail_path=${FOLDERFRAME_THUMBNAIL_PATH:-/config/thumbnails}
 manifest_path=${FOLDERFRAME_MANIFEST_PATH:-/config/folderframe-data/library.json}
 
@@ -64,6 +65,7 @@ validate_choice FOLDERFRAME_SHUFFLE "$shuffle" true false
 validate_choice FOLDERFRAME_REMEMBER_PREFERENCES "$remember_preferences" true false
 validate_choice FOLDERFRAME_THUMBNAILS "$thumbnail_generation" true false
 validate_choice FOLDERFRAME_MANIFEST "$manifest_generation" true false
+validate_choice FOLDERFRAME_MANUAL_REFRESH "$manual_refresh" true false
 
 validate_integer_range() {
     setting_name=$1
@@ -126,6 +128,7 @@ jq \
     --arg remember_preferences "$remember_preferences" \
     --arg thumbnail_generation "$thumbnail_generation" \
     --arg manifest_generation "$manifest_generation" \
+    --arg manual_refresh "$manual_refresh" \
     '
     if $source_label != "" then
         if (.sources | type) == "array" and (.sources | length) > 0
@@ -178,6 +181,14 @@ jq \
             end
         )
       end
+    | if ($manifest_generation == "true" and $manual_refresh == "true") then
+        .sources |= map(
+            if ((.path | type) == "string" and (.path | startswith("photos/")))
+            then .refreshPath = "folderframe-api/refresh"
+            else .
+            end
+        )
+      else .sources |= map(del(.refreshPath)) end
     | if ($thumbnail_generation == "true" or $manifest_generation == "true") then
         .sources |= map(
             if ((.path | type) == "string" and (.path | startswith("photos/")))

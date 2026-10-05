@@ -14,7 +14,7 @@ COPY upstream/LICENSE /usr/share/licenses/folderframe/LICENSE
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY docker-entrypoint.sh /usr/bin/folderframe-entrypoint
 COPY thumbnail_worker.py /usr/share/folderframe/thumbnail_worker.py
-COPY transcode_service.py service_runner.py /usr/share/folderframe/
+COPY transcode_service.py service_runner.py refresh_control.py /usr/share/folderframe/
 
 # `/media` is an image-owned mount parent. Do not bind-mount it read-only:
 # Docker must be able to create sibling bind targets below it.

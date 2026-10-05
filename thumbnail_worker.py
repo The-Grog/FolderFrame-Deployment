@@ -11,6 +11,9 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from uuid import uuid4
+from refresh_control import claim as claim_refresh, finish as finish_refresh, recover as recover_refresh
 
 STOP = False
 
@@ -144,7 +147,8 @@ def helper_command(helper: Path, media_root: Path, thumbnail_root: Path,
         command.extend(["--status-file", str(status_path)])
     return command
 def run_once(command: list[str], manifest_path: Path | None,
-        status_path: Path | None = None) -> bool:
+        status_path: Path | None = None, run_id: str | None = None,
+        request_id: str | None = None) -> bool:
     if manifest_path is not None:
         status = manifest_status(manifest_path)
         if status == "missing":
@@ -152,24 +156,26 @@ def run_once(command: list[str], manifest_path: Path | None,
         elif status == "invalid":
             log("persistent manifest is invalid; helper will rebuild the full index")
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    write_status(status_path, {
-        "version": 1,
-        "outcome": "running",
-        "startedAt": started_at,
-    })
+    running = {"version": 1, "outcome": "running", "startedAt": started_at}
+    if run_id: running["runId"] = run_id
+    if request_id: running["requestId"] = request_id
+    write_status(status_path, running)
     try:
         subprocess.run(command, check=True)
     except (OSError, subprocess.CalledProcessError) as error:
-        write_status(status_path, {
-            "version": 1,
-            "startedAt": started_at,
+        failed = {"version": 1, "startedAt": started_at,
             "completedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "outcome": "failed",
-            "error": str(error),
-        })
+            "outcome": "failed", "error": str(error)}
+        if run_id: failed["runId"] = run_id
+        if request_id: failed["requestId"] = request_id
+        write_status(status_path, failed)
         log(f"scan failed; gallery remains available: {error}")
         return False
     status = read_status(status_path)
+    if status:
+        if run_id: status["runId"] = run_id
+        if request_id: status["requestId"] = request_id
+        write_status(status_path, status)
     log(status_summary(status) if status else "scan complete")
     return True
 
@@ -197,6 +203,9 @@ def main() -> int:
     status_path = Path(os.environ.get(
         "FOLDERFRAME_WORKER_STATUS_PATH", "/config/folderframe-data/worker-status.json"
     )).resolve()
+    refresh_request_path = Path(os.environ.get(
+        "FOLDERFRAME_REFRESH_REQUEST_PATH", "/config/folderframe-data/refresh-request.json"
+    )).resolve()
     helper = Path(os.environ.get(
         "FOLDERFRAME_HELPER_PATH", "/usr/share/folderframe/generate_thumbnails.py"
     )).resolve()
@@ -222,11 +231,23 @@ def main() -> int:
         "thumbnails-only" if thumbnails else "manifest-only"
     )
     log(f"enabled; mode={mode}, interval={interval}s")
+    recover_refresh(refresh_request_path)
+    next_scheduled = 0.0
     while not STOP:
-        run_once(command, manifest_path if manifest else None, status_path)
-        deadline = time.monotonic() + interval
-        while not STOP and time.monotonic() < deadline:
-            time.sleep(min(1, max(0, deadline - time.monotonic())))
+        manual = claim_refresh(refresh_request_path)
+        now = time.monotonic()
+        if manual is None and now < next_scheduled:
+            time.sleep(min(1, next_scheduled - now))
+            continue
+        run_id = manual["runId"] if manual else uuid4().hex
+        request_id = manual["requestId"] if manual else None
+        succeeded = run_once(command, manifest_path if manifest else None, status_path, run_id, request_id)
+        if manual:
+            published = read_status(status_path) or {}
+            finish_refresh(refresh_request_path, run_id,
+                published.get("outcome", "complete" if succeeded else "failed"),
+                published.get("completedAt"))
+        next_scheduled = time.monotonic() + interval
     log("stopped")
     return 0
 

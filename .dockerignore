@@ -4,6 +4,7 @@
 !docker-entrypoint.sh
 !thumbnail_worker.py
 !transcode_service.py
+!refresh_control.py
 !service_runner.py
 !upstream/
 !upstream/docs/

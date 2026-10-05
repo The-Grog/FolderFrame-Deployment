@@ -131,3 +131,7 @@ platform descriptors and that all release tags resolve to the same index digest.
 ## Community Apps
 
 Keep `templates/folderframe.xml` and `ca_profile.xml` aligned with the current public contract. Run Validate and Scan in the official submission portal after meaningful XML changes.
+
+## Manual refresh contract
+
+The public runtime config advertises `refreshPath` only when `FOLDERFRAME_MANIFEST=true` and `FOLDERFRAME_MANUAL_REFRESH=true`. `POST /folderframe-api/refresh` is same-origin only, accepts no paths or generator options, atomically queues at most one pending pass, and returns a stable request ID. The worker is the sole generator owner and publishes that request ID plus a run ID in running/final status. GET never triggers work. Release smoke tests should cover disabled, cross-origin, coalesced, in-flight follow-up, and restart-recovery cases.

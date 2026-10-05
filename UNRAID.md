@@ -189,3 +189,7 @@ For rollback, edit the Repository field to a known version tag such as `ghcr.io/
 ## Security
 
 FolderFrame has no built-in authentication or TLS. Anyone who can reach it can browse and download mounted media and read the served configuration. Keep it on a trusted network unless a separate access layer provides authentication and TLS. Never mount an entire share, repository, secrets, private files, or symlinks to private locations.
+
+## Manual Refresh
+
+**Manual Refresh** defaults to `true` when the persistent manifest is enabled. Clicking **Refresh** in the gallery requests the same incremental worker used by the schedule, then loads the published result when it completes. Set the field to `false` to keep scheduled scans but disable browser-triggered scans. Anyone who can reach an unprotected WebUI can request work; use the same proxy authentication for the whole FolderFrame origin.

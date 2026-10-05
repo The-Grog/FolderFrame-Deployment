@@ -339,3 +339,7 @@ The image contains Caddy plus an explicit allowlist of FolderFrame runtime asset
 Report packaging, Docker, and Unraid issues in [FolderFrame Deployment issues](https://github.com/The-Grog/FolderFrame-Deployment/issues). Report application behavior in [FolderFrame issues](https://github.com/The-Grog/FolderFrame/issues).
 
 Maintainer release and verification procedures are documented in [MAINTAINERS.md](MAINTAINERS.md).
+
+## Manual Refresh
+
+With the persistent manifest enabled, the container advertises a same-origin **Refresh** endpoint. Refresh requests the existing incremental thumbnail/metadata/manifest worker; it does not start a second generator or force regeneration of unchanged files. One pending request is coalesced while a scan is active, accepted work survives a worker restart, and bounded outcome plus coalesced-ID history lets clients reconcile an accepted request after later scans or reconnects. Retrying an ambiguous request with the same client ID is idempotent, including when it joined another pending request. Set `FOLDERFRAME_MANUAL_REFRESH=false` to disable the endpoint while keeping scheduled scans. Anyone able to use an unprotected WebUI can request a scan, so preserve the same reverse-proxy authentication boundary for `/folderframe-api/refresh`.
