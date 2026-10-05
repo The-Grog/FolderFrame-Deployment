@@ -148,7 +148,7 @@ test -s "$config/thumbnails/Archive/archive.png.webp"
 test -s "$config/folderframe-data/exif.d/Library/library.jpg.json"
 test -s "$config/folderframe-data/library.json"
 curl --fail "$base/folderframe-data/worker-status.json" -o "$work/worker-status.json"
-test "$(curl -s -o /dev/null -w '%{http_code}' "$base/folderframe-api/refresh")" = 405
+test "$(curl -s -o /dev/null -w '%{http_code}' "$base/folderframe-api/refresh")" = 400
 curl --fail -X POST -H "Origin: $base" -H 'X-FolderFrame-Request-ID: smoke_refresh' \
   "$base/folderframe-api/refresh" -o "$work/refresh-ack.json"
 grep -q '"requestId": "smoke_refresh"' "$work/refresh-ack.json"
