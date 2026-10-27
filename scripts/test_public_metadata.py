@@ -42,6 +42,7 @@ WORKER_OVERRIDES = {
     "Manual Refresh": ("FOLDERFRAME_MANUAL_REFRESH", "true"),
 }
 THUMBNAIL_OVERRIDES = {
+    "Video Thumbnails": ("FOLDERFRAME_VIDEO_THUMBNAILS", "true"),
     "Generate Thumbnails": ("FOLDERFRAME_THUMBNAILS", "true"),
     "Persistent Media Manifest": ("FOLDERFRAME_MANIFEST", "true"),
     "Thumbnail Scan Interval": ("FOLDERFRAME_THUMBNAIL_INTERVAL", "3600"),
@@ -124,6 +125,7 @@ class PublicMetadataTests(unittest.TestCase):
             with self.subTest(variable=variable):
                 self.assertIn(f"{variable}:", text)
         self.assertIn('FOLDERFRAME_THUMBNAILS: "${FOLDERFRAME_THUMBNAILS:-true}"', text)
+        self.assertIn('FOLDERFRAME_VIDEO_THUMBNAILS: "${FOLDERFRAME_VIDEO_THUMBNAILS:-true}"', text)
         self.assertIn('FOLDERFRAME_MANIFEST: "${FOLDERFRAME_MANIFEST:-true}"', text)
         self.assertIn('FOLDERFRAME_THUMBNAIL_INTERVAL: "${FOLDERFRAME_THUMBNAIL_INTERVAL:-3600}"', text)
         for variable, default in TRANSCODE_OVERRIDES.values():

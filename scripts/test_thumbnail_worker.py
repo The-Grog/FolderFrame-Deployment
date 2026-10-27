@@ -35,6 +35,18 @@ class MediaWorkerTests(unittest.TestCase):
         self.assertNotIn("--manifest", command)
         self.assertNotIn("--manifest-only", command)
 
+    def test_video_posters_default_on_and_disable_is_forwarded(self):
+        self.assertNotIn("--no-video-thumbnails", self.command(True, True))
+        for thumbnails in (True, False):
+            command = WORKER.helper_command(pathlib.Path("/helper.py"),
+                pathlib.Path("/media"), pathlib.Path("/thumbs"), pathlib.Path("/manifest.json"),
+                thumbnails, True, 480, 80, video_thumbnails=False)
+            self.assertEqual("--no-video-thumbnails" in command, thumbnails)
+        with mock.patch.dict(WORKER.os.environ, {}, clear=True):
+            self.assertTrue(WORKER.enabled_setting("FOLDERFRAME_VIDEO_THUMBNAILS", True))
+        with mock.patch.dict(WORKER.os.environ, {"FOLDERFRAME_VIDEO_THUMBNAILS": "false"}, clear=True):
+            self.assertFalse(WORKER.enabled_setting("FOLDERFRAME_VIDEO_THUMBNAILS", True))
+
     def test_manifest_only_command(self):
         self.assertEqual(self.command(False, True), [
             WORKER.sys.executable, str(pathlib.Path("/helper.py")), str(pathlib.Path("/media")), "--manifest",

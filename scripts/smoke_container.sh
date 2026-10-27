@@ -145,6 +145,13 @@ done
 test -s "$config/thumbnails/Library/library.jpg.webp"
 test -s "$config/thumbnails/Library/library.heic.webp"
 test -s "$config/thumbnails/Archive/archive.png.webp"
+test -s "$config/thumbnails/Archive/fallback.mov.webp"
+docker exec -i "$name" python3 - <<'PY'
+from PIL import Image
+with Image.open('/config/thumbnails/Archive/fallback.mov.webp') as image:
+    image.load()
+    assert image.format == 'WEBP' and image.size == (64, 48), image.size
+PY
 test -s "$config/folderframe-data/exif.d/Library/library.jpg.json"
 test -s "$config/folderframe-data/library.json"
 curl --fail "$base/folderframe-data/worker-status.json" -o "$work/worker-status.json"
@@ -177,16 +184,18 @@ for descriptor in m["chunks"].values():
         records.update({record["path"]: record for record in directory["files"]})
 assert {"Archive/archive.png", "Archive/fallback.mov", "Library/library.jpg", "Library/library.heic"} <= set(records)
 assert records["Library/library.jpg"]["exifPath"] == "exif.d/Library/library.jpg.json"
+assert records["Archive/fallback.mov"]["thumbnailPath"] == "Archive/fallback.mov.webp"
 PY
-python3 - "$work/worker-status.json" <<'PY'
-import json, sys
-s = json.load(open(sys.argv[1], encoding="utf-8"))
+docker exec -i "$name" python3 - <<'PY'
+import json
+s = json.load(open('/config/folderframe-data/worker-status.json', encoding="utf-8"))
 assert s["version"] == 1
 assert s["outcome"] in {"complete", "complete_with_warnings"}
 PY
 
 jpg_thumb_before=$(stat -c %Y "$config/thumbnails/Library/library.jpg.webp")
 heic_thumb_before=$(stat -c %Y "$config/thumbnails/Library/library.heic.webp")
+video_thumb_before=$(stat -c %Y "$config/thumbnails/Archive/fallback.mov.webp")
 docker exec "$name" python3 /usr/share/folderframe/generate_thumbnails.py \
   /media /config/thumbnails \
   --manifest /config/folderframe-data/library.json \
@@ -195,12 +204,13 @@ docker exec "$name" python3 /usr/share/folderframe/generate_thumbnails.py \
   --status-file /config/folderframe-data/worker-status.json
 test "$(stat -c %Y "$config/thumbnails/Library/library.jpg.webp")" = "$jpg_thumb_before"
 test "$(stat -c %Y "$config/thumbnails/Library/library.heic.webp")" = "$heic_thumb_before"
+test "$(stat -c %Y "$config/thumbnails/Archive/fallback.mov.webp")" = "$video_thumb_before"
 docker exec -i "$name" python3 - <<'PY'
 import json
 s = json.load(open("/config/folderframe-data/worker-status.json", encoding="utf-8"))
 assert s["outcome"] == "complete", s
 assert s["thumbnailsGenerated"] == 0, s
-assert s["thumbnailsCurrent"] >= 3, s
+assert s["thumbnailsCurrent"] >= 4, s
 assert s["metadataReused"] >= 3, s
 PY
 

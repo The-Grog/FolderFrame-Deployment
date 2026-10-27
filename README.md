@@ -178,6 +178,25 @@ media uses no transcoding CPU. See [configuration, security, and limits](TRANSCO
 
 ## Persistent thumbnails and media manifest
 
+Video posters are enabled by default, including installations without an explicit
+`FOLDERFRAME_VIDEO_THUMBNAILS` variable. The existing single worker generates one
+WebP per MP4/MOV/WEBM/M4V with FFmpeg, sequentially and with bounded CPU threads
+and timeouts. First scans take longer; unchanged posters reuse source signatures
+and size/quality settings. Posters live beside image thumbnails and use the
+existing manifest `thumbnailPath`. The gallery loads those images with its video
+badges; missing/broken posters fall back once to browser video previews.
+
+Set `FOLDERFRAME_VIDEO_THUMBNAILS=false` to stop new video posters while keeping
+image generation and confirmed cached posters for unchanged sources.
+`FOLDERFRAME_THUMBNAILS=false` disables all image/video generation; manifest-only
+runs never create posters. Generated/reused/failed thumbnail status counters
+include both kinds. Unchanged cached failures are informational. To retry a failed
+poster, change its source/settings or remove its entry in
+`/config/folderframe-data/thumbnail-failures.json`. Missing FFmpeg is reported
+once per scan and retries after tooling becomes available. Originals stay
+read-only; temporary output is validated before atomic replacement. Startup,
+scheduled, and manual Refresh scans use this same implementation.
+
 One background worker invokes the release-provided `generate_thumbnails.py`
 helper at startup and at the configured interval.
 

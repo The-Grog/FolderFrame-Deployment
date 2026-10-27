@@ -131,10 +131,13 @@ def status_summary(status: dict) -> str:
 def helper_command(helper: Path, media_root: Path, thumbnail_root: Path,
         manifest_path: Path, thumbnails: bool, manifest: bool,
         size: int, quality: int, failure_cache_path: Path | None = None,
-        thumbnail_cache_path: Path | None = None, status_path: Path | None = None) -> list[str]:
+        thumbnail_cache_path: Path | None = None, status_path: Path | None = None,
+        video_thumbnails: bool = True) -> list[str]:
     command = [sys.executable, str(helper), str(media_root)]
     if thumbnails:
         command.extend([str(thumbnail_root), "--size", str(size), "--quality", str(quality)])
+        if not video_thumbnails:
+            command.append("--no-video-thumbnails")
     if manifest:
         command.extend(["--manifest", str(manifest_path)])
         if not thumbnails:
@@ -183,6 +186,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, stop_worker)
     signal.signal(signal.SIGINT, stop_worker)
     thumbnails = enabled_setting("FOLDERFRAME_THUMBNAILS", True)
+    video_thumbnails = enabled_setting("FOLDERFRAME_VIDEO_THUMBNAILS", True)
     manifest = enabled_setting("FOLDERFRAME_MANIFEST", True)
     if not thumbnails and not manifest:
         log("thumbnails and manifest are disabled")
@@ -226,7 +230,7 @@ def main() -> int:
     command = helper_command(helper, media_root, thumbnail_root, manifest_path,
         thumbnails, manifest, size, quality,
         failure_cache_path if thumbnails else None,
-        thumbnail_cache_path if thumbnails else None, status_path)
+        thumbnail_cache_path if thumbnails else None, status_path, video_thumbnails)
     mode = "thumbnails+manifest" if thumbnails and manifest else (
         "thumbnails-only" if thumbnails else "manifest-only"
     )

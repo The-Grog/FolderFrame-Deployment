@@ -96,12 +96,27 @@ The Unraid fields below provide optional overrides for common settings:
 | Embed Refresh Interval | `FOLDERFRAME_EMBED_REFRESH_INTERVAL` | `embed.refreshInterval` | Integer seconds from `1` to `86400` |
 | Remember Browser Preferences | `FOLDERFRAME_REMEMBER_PREFERENCES` | `defaults.rememberPreferences` | `true`, `false` |
 | Generate Thumbnails | `FOLDERFRAME_THUMBNAILS` | `sources[0].thumbnailPath` in the runtime copy | `true`, `false` |
+| Video Thumbnails | `FOLDERFRAME_VIDEO_THUMBNAILS` | Worker video poster generation; enabled by default | `true`, `false` |
 | Persistent Media Manifest | `FOLDERFRAME_MANIFEST` | `sources[0].manifestPath` in the runtime copy | `true`, `false` |
 | Thumbnail Scan Interval | `FOLDERFRAME_THUMBNAIL_INTERVAL` | Shared background worker | Integer seconds from `60` to `86400` |
 
 Blank override fields defer to the persistent JSON file. Explicit overrides are applied to a generated runtime copy; the persistent JSON file is never rewritten.
 
 ## Persistent thumbnails and manifest
+
+**Video Thumbnails** defaults to `true`, also for existing containers without the
+variable. The same worker sequentially generates a WebP poster for each supported
+video with FFmpeg. First scans take longer; unchanged posters are cached. The grid
+loads these images with play/duration badges and falls back once to browser video
+previews when a poster is unavailable. Set this field to `false` to keep image
+thumbnails while stopping new video posters; confirmed unchanged posters remain.
+**Generate Thumbnails** is the master switch and disables both kinds. Manifest-only
+runs never generate posters. Existing thumbnail status counts include both kinds.
+Failed extraction is cached until source/settings change or its entry is removed
+from `/config/folderframe-data/thumbnail-failures.json`; skipped cached failures
+are informational. Missing FFmpeg recovers automatically after installation.
+Originals remain read-only. Startup, scheduled scans, and manual Refresh share
+one worker and the same cache.
 
 The CA template enables both by default. They share one scan interval and are
 independently configurable:
