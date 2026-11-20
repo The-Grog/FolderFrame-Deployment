@@ -98,7 +98,7 @@ The Unraid fields below provide optional overrides for common settings:
 | Generate Thumbnails | `FOLDERFRAME_THUMBNAILS` | `sources[0].thumbnailPath` in the runtime copy | `true`, `false` |
 | Video Thumbnails | `FOLDERFRAME_VIDEO_THUMBNAILS` | Worker video poster generation; enabled by default | `true`, `false` |
 | Persistent Media Manifest | `FOLDERFRAME_MANIFEST` | `sources[0].manifestPath` in the runtime copy | `true`, `false` |
-| Thumbnail Scan Interval | `FOLDERFRAME_THUMBNAIL_INTERVAL` | Shared background worker | Integer seconds from `60` to `86400` |
+| Library Scan Interval | `FOLDERFRAME_THUMBNAIL_INTERVAL` | Shared background worker | Integer seconds from `60` to `86400` |
 
 Blank override fields defer to the persistent JSON file. Explicit overrides are applied to a generated runtime copy; the persistent JSON file is never rewritten.
 
@@ -152,6 +152,46 @@ scan after upgrading may reconcile unsigned existing previews. Media mounts stay
 read-only and originals are never modified.
 
 FolderFrame resolves startup settings in this order: packaged defaults, persistent JSON, explicit container overrides, saved browser preferences, then URL parameters. If a changed default appears to have no effect, set **Remember Browser Preferences** to `false`, clear that browser's saved FolderFrame preferences, or test with `?remember=0`.
+
+### Large-library cache reuse
+
+Thumbnail validation records are retained for every generated image thumbnail and
+video poster; there is no fixed entry cap. Existing JSON caches remain compatible.
+Previously discarded records may require a one-time regeneration, especially for
+video posters, before subsequent scans can reuse them reliably. Do not delete
+working caches as part of the upgrade.
+
+Unchanged thumbnail, failure, and metadata caches and manifest files are not
+rewritten. Cache `updatedAt` and manifest `generatedAt` timestamps change only when
+the corresponding file is published; use worker status for the latest scan time.
+Worker status still updates after every run, including runs with no media changes.
+Changed files are replaced atomically. A one-entry cache change still rewrites that
+JSON cache; this is not an in-place record store. The worker still loads caches and
+checks source files, so very large libraries require adequate RAM and scan time.
+Records for unvisited sources are retained when discovery is incomplete; complete
+scans remove obsolete records and safely reconcile orphaned thumbnails.
+
+
+### Choosing the library scan interval
+
+`FOLDERFRAME_THUMBNAIL_INTERVAL` controls the shared thumbnail, metadata, and
+manifest scan. Its name is retained for compatibility; the Unraid template labels
+it **Library Scan Interval**. The default stays **3600 seconds (one hour)**, with
+an allowed range of 60-86400 seconds.
+
+| Library use | Suggested starting interval | Value |
+| --- | --- | --- |
+| Regular additions and reasonably quick scans | 1 hour (default) | `3600` |
+| Large library with occasional additions | 6 hours | `21600` |
+| Mostly unchanged archive | 24 hours | `86400` |
+
+The worker scans at startup, then waits the configured interval **after a scan
+finishes**. Manual Refresh can request work sooner and resets the scheduled wait
+after that work finishes. Scans remain sequential. For a multi-million-item
+library, start with six hours and adjust using measured scan duration and how
+quickly new media needs to appear. Use Refresh after imports when immediate
+updates are needed. A longer interval reduces repeated traversal and disk activity;
+it does not replace correct cache reuse or establish a supported library-size limit.
 
 ## Existing installations
 

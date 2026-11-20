@@ -283,6 +283,46 @@ manifest filename `library.json`; public access is deliberately limited to
 the thumbnail route. Internal caches and dotfiles,
 including the EXIF extraction cache, are not served.
 
+### Large-library cache reuse
+
+Thumbnail validation records are retained for every generated image thumbnail and
+video poster; there is no fixed entry cap. Existing JSON caches remain compatible.
+Previously discarded records may require a one-time regeneration, especially for
+video posters, before subsequent scans can reuse them reliably. Do not delete
+working caches as part of the upgrade.
+
+Unchanged thumbnail, failure, and metadata caches and manifest files are not
+rewritten. Cache `updatedAt` and manifest `generatedAt` timestamps change only when
+the corresponding file is published; use worker status for the latest scan time.
+Worker status still updates after every run, including runs with no media changes.
+Changed files are replaced atomically. A one-entry cache change still rewrites that
+JSON cache; this is not an in-place record store. The worker still loads caches and
+checks source files, so very large libraries require adequate RAM and scan time.
+Records for unvisited sources are retained when discovery is incomplete; complete
+scans remove obsolete records and safely reconcile orphaned thumbnails.
+
+
+### Choosing the library scan interval
+
+`FOLDERFRAME_THUMBNAIL_INTERVAL` controls the shared thumbnail, metadata, and
+manifest scan. Its name is retained for compatibility; the Unraid template labels
+it **Library Scan Interval**. The default stays **3600 seconds (one hour)**, with
+an allowed range of 60-86400 seconds.
+
+| Library use | Suggested starting interval | Value |
+| --- | --- | --- |
+| Regular additions and reasonably quick scans | 1 hour (default) | `3600` |
+| Large library with occasional additions | 6 hours | `21600` |
+| Mostly unchanged archive | 24 hours | `86400` |
+
+The worker scans at startup, then waits the configured interval **after a scan
+finishes**. Manual Refresh can request work sooner and resets the scheduled wait
+after that work finishes. Scans remain sequential. For a multi-million-item
+library, start with six hours and adjust using measured scan duration and how
+quickly new media needs to appear. Use Refresh after imports when immediate
+updates are needed. A longer interval reduces repeated traversal and disk activity;
+it does not replace correct cache reuse or establish a supported library-size limit.
+
 ## Supported architectures
 
 FolderFrame `v0.8.6` is published as a verified multi-platform image index for
