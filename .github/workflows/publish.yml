@@ -133,6 +133,10 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
+          build-args: |
+            APP_VERSION=${{ steps.release.outputs.tag }}
+            APP_REVISION=${{ steps.release.outputs.sha }}
+            DEPLOYMENT_REVISION=${{ github.sha }}
           pull: true
           push: true
           provenance: false
@@ -162,6 +166,10 @@ jobs:
         with:
           context: .
           platforms: linux/arm64
+          build-args: |
+            APP_VERSION=${{ steps.release.outputs.tag }}
+            APP_REVISION=${{ steps.release.outputs.sha }}
+            DEPLOYMENT_REVISION=${{ github.sha }}
           pull: true
           push: true
           provenance: false

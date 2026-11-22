@@ -283,6 +283,18 @@ manifest filename `library.json`; public access is deliberately limited to
 the thumbnail route. Internal caches and dotfiles,
 including the EXIF extraction cache, are not served.
 
+### Installed version in About
+
+About FolderFrame is last in both app options menus. Published images stamp
+`/srv/app/build-info.json` with the same release, app revision, and deployment
+revision used in the image labels. The public file contains no configuration or
+media information and is served with the existing app asset cache policy.
+
+Local builds default to **Development / unknown version**. For a clean release
+checkout, supply `APP_VERSION`, `APP_REVISION`, and `DEPLOYMENT_REVISION` as Docker
+build arguments; do not stamp modified source as an unchanged release. Both
+architecture smoke tests check the served metadata against the image labels.
+
 ### Large-library cache reuse
 
 Thumbnail validation records are retained for every generated image thumbnail and

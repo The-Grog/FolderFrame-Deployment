@@ -113,6 +113,22 @@ curl --fail "$base/index.html?v=smoke-${app_sha}" -o "$work/deployed-index.html"
 grep -q 'function cycleGridDensity' "$work/deployed-app.js"
 grep -q 'function setScanProgressBar' "$work/deployed-app.js"
 grep -q 'id="btn-grid-density"' "$work/deployed-index.html"
+grep -q 'id="btn-about-grid"' "$work/deployed-index.html"
+curl --fail "$base/about.js" -o "$work/about.js"
+curl --fail "$base/build-info.json" -o "$work/build-info.json"
+expected_version=$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
+expected_deployment=$(docker image inspect "$image" --format '{{ index .Config.Labels "io.folderframe.deployment-revision" }}')
+python3 - "$work/build-info.json" "$app_sha" "$expected_version" "$expected_deployment" <<'PY'
+import json, sys
+info = json.load(open(sys.argv[1], encoding="utf-8"))
+assert set(info) == {"schemaVersion", "version", "revision", "deploymentRevision"}
+assert info["schemaVersion"] == 1
+assert (info["version"] or "") == sys.argv[3]
+assert (info["deploymentRevision"] or "") == sys.argv[4]
+# Unstamped local builds intentionally report unknown; published images must match.
+if info["version"] or info["revision"]:
+    assert info["revision"] == sys.argv[2]
+PY
 grep -q 'id="scan-progress-track"' "$work/deployed-index.html"
 curl --fail "$base/folderframe.config.json" -o "$work/runtime-config.json"
 docker exec -i "$name" python3 - <<'PY'

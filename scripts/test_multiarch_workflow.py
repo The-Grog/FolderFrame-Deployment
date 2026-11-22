@@ -91,6 +91,18 @@ class MultiArchitectureWorkflowTests(unittest.TestCase):
         self.assertNotIn('--tag "$dockerhub_image:candidate-', mirror)
         self.assertNotIn('--tag "$dockerhub_image:build-', mirror)
         self.assertNotIn('--tag "$dockerhub_image:test"', mirror)
+    def test_about_build_identity_is_supplied_for_both_architectures(self):
+        workflow = (ROOT / ".github/workflows/publish.yml").read_text()
+        for argument in ("APP_VERSION=${{ steps.release.outputs.tag }}", "APP_REVISION=${{ steps.release.outputs.sha }}", "DEPLOYMENT_REVISION=${{ github.sha }}"):
+            self.assertEqual(workflow.count(argument), 2)
+        dockerfile = (ROOT / "Dockerfile").read_text()
+        ignore = (ROOT / ".dockerignore").read_text()
+        self.assertIn("upstream/about.js", dockerfile)
+        self.assertIn("/srv/app/build-info.json", dockerfile)
+        self.assertIn("!upstream/about.js", ignore)
+        self.assertIn("!upstream/scripts/write_build_info.py", ignore)
+        self.assertIn('curl --fail "$base/build-info.json"', (ROOT / "scripts/smoke_container.sh").read_text())
+
     def test_smoke_test_exercises_real_media_paths(self):
         smoke = (ROOT / "scripts" / "smoke_container.sh").read_text(encoding="utf-8")
         for expected in (

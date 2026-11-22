@@ -83,7 +83,15 @@ The Caddy base image is pinned by digest. Update it deliberately and rerun all t
 python -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-For a local image build, create a clean `upstream` checkout at an existing published release tag, then run `docker build --pull -t folderframe:local .`.
+For a local image build, create a clean `upstream` checkout at a release containing
+`scripts/write_build_info.py`, then run `docker build --pull -t folderframe:local .`.
+Without identity arguments, About correctly displays Development / unknown version.
+To stamp a clean checkout, pass `--build-arg APP_VERSION=YOUR_TAG`,
+`--build-arg APP_REVISION=FULL_APP_SHA`, and
+`--build-arg DEPLOYMENT_REVISION=FULL_DEPLOYMENT_SHA`. The publication workflow
+supplies these automatically for both architectures; the smoke suite compares the
+public build metadata with OCI labels. Never use the latest available release as
+an identity for older or modified files.
 This recipe requires the Apple-media core release with `vendor/heic-to-1.5.2/`
 and `THIRD_PARTY_NOTICES.md`; older release inputs intentionally fail the copy
 step. Coordinate the core release before publishing this recipe. Run the Linux
