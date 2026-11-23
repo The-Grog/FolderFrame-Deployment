@@ -60,6 +60,14 @@ def input_format(fd):
         return 'mov'
     if header.startswith(b'\x1a\x45\xdf\xa3'):
         return 'matroska'
+    if header.startswith(b'RIFF') and header[8:12] == b'AVI ':
+        return 'avi'
+    if header.startswith(bytes.fromhex('3026b2758e66cf11a6d900aa0062ce6c')):
+        return 'asf'
+    if header.startswith(b'\x00\x00\x01\xba'):
+        return 'mpeg'
+    if header.startswith(b'\x00\x00\x01\xb3'):
+        return 'mpegvideo'
     raise RequestError(415, 'Unsupported video container')
 
 

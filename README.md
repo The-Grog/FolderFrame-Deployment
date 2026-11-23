@@ -180,7 +180,7 @@ media uses no transcoding CPU. See [configuration, security, and limits](TRANSCO
 
 Video posters are enabled by default, including installations without an explicit
 `FOLDERFRAME_VIDEO_THUMBNAILS` variable. The existing single worker generates one
-WebP per MP4/MOV/WEBM/M4V with FFmpeg, sequentially and with bounded CPU threads
+WebP per supported video with FFmpeg, sequentially and with bounded CPU threads
 and timeouts. First scans take longer; unchanged posters reuse source signatures
 and size/quality settings. Posters live beside image thumbnails and use the
 existing manifest `thumbnailPath`. The gallery loads those images with its video
@@ -251,7 +251,7 @@ The first upgraded scan may reconcile previews that lack trusted signatures.
 JPEG, PNG, WebP, GIF, HEIC, and HEIF thumbnails are supported through Pillow
 and pillow-heif. Videos are indexed but do not receive generated thumbnails.
 The image's pinned FFmpeg package also supplies `ffprobe`; compatible core
-releases use it to publish optional MP4, MOV, WEBM, and M4V durations for grid
+releases use it to publish optional video durations for grid
 badges. Failed optional duration reads do not fail or warn the worker scan.
 Original media is never modified.
 

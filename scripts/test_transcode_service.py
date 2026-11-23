@@ -17,6 +17,28 @@ spec.loader.exec_module(api)
 import refresh_control
 
 
+class InputFormatTests(unittest.TestCase):
+    def test_only_supported_container_headers_select_a_demuxer(self):
+        supported = {
+            b'RIFF\x80\x00\x00\x00AVI ': 'avi',
+            bytes.fromhex('3026b2758e66cf11a6d900aa0062ce6c'): 'asf',
+            b'\x00\x00\x01\xba': 'mpeg',
+            b'\x00\x00\x01\xb3': 'mpegvideo',
+            b'\x1a\x45\xdf\xa3': 'matroska',
+            b'\x00\x00\x00\x18ftyp3gp4': 'mov',
+            b'\x00\x00\x00\x18ftyp3g2a': 'mov',
+        }
+        for header, expected in supported.items():
+            with self.subTest(demuxer=expected), patch.object(api.os, 'pread', return_value=header, create=True):
+                self.assertEqual(api.input_format(123), expected)
+        for header in (b'', b'RIFF', b'RIFF\x80\x00\x00\x00WAVE', b'RIFF\x80\x00\x00\x00WEBP',
+                       b'FLV\x01', b'#EXTM3U\nhttps://example.test/clip.avi'):
+            with self.subTest(header=header), patch.object(api.os, 'pread', return_value=header, create=True):
+                with self.assertRaises(api.RequestError) as error:
+                    api.input_format(123)
+                self.assertEqual(error.exception.status, 415)
+
+
 @unittest.skipUnless(os.name == 'posix' and Path('/proc/self/fd').exists(), 'Linux descriptor containment required')
 class StreamingTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
