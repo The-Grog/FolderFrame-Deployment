@@ -180,7 +180,7 @@ media uses no transcoding CPU. See [configuration, security, and limits](TRANSCO
 
 Video posters are enabled by default, including installations without an explicit
 `FOLDERFRAME_VIDEO_THUMBNAILS` variable. The existing single worker generates one
-WebP per MP4/MOV/WEBM/M4V with FFmpeg, sequentially and with bounded CPU threads
+WebP per supported video with FFmpeg, sequentially and with bounded CPU threads
 and timeouts. First scans take longer; unchanged posters reuse source signatures
 and size/quality settings. Posters live beside image thumbnails and use the
 existing manifest `thumbnailPath`. The gallery loads those images with its video
@@ -251,7 +251,7 @@ The first upgraded scan may reconcile previews that lack trusted signatures.
 JPEG, PNG, WebP, GIF, HEIC, and HEIF thumbnails are supported through Pillow
 and pillow-heif. Videos are indexed but do not receive generated thumbnails.
 The image's pinned FFmpeg package also supplies `ffprobe`; compatible core
-releases use it to publish optional MP4, MOV, WEBM, and M4V durations for grid
+releases use it to publish optional video durations for grid
 badges. Failed optional duration reads do not fail or warn the worker scan.
 Original media is never modified.
 
@@ -282,6 +282,58 @@ manifest filename `library.json`; public access is deliberately limited to
 `/folderframe-data/exif.d/*.json`, `/folderframe-data/worker-status.json`, and
 the thumbnail route. Internal caches and dotfiles,
 including the EXIF extraction cache, are not served.
+
+### Installed version in About
+
+About FolderFrame is last in both app options menus. Published images stamp
+`/srv/app/build-info.json` with the same release, app revision, and deployment
+revision used in the image labels. The public file contains no configuration or
+media information and is served with the existing app asset cache policy.
+
+Local builds default to **Development / unknown version**. For a clean release
+checkout, supply `APP_VERSION`, `APP_REVISION`, and `DEPLOYMENT_REVISION` as Docker
+build arguments; do not stamp modified source as an unchanged release. Both
+architecture smoke tests check the served metadata against the image labels.
+
+### Large-library cache reuse
+
+Thumbnail validation records are retained for every generated image thumbnail and
+video poster; there is no fixed entry cap. Existing JSON caches remain compatible.
+Previously discarded records may require a one-time regeneration, especially for
+video posters, before subsequent scans can reuse them reliably. Do not delete
+working caches as part of the upgrade.
+
+Unchanged thumbnail, failure, and metadata caches and manifest files are not
+rewritten. Cache `updatedAt` and manifest `generatedAt` timestamps change only when
+the corresponding file is published; use worker status for the latest scan time.
+Worker status still updates after every run, including runs with no media changes.
+Changed files are replaced atomically. A one-entry cache change still rewrites that
+JSON cache; this is not an in-place record store. The worker still loads caches and
+checks source files, so very large libraries require adequate RAM and scan time.
+Records for unvisited sources are retained when discovery is incomplete; complete
+scans remove obsolete records and safely reconcile orphaned thumbnails.
+
+
+### Choosing the library scan interval
+
+`FOLDERFRAME_THUMBNAIL_INTERVAL` controls the shared thumbnail, metadata, and
+manifest scan. Its name is retained for compatibility; the Unraid template labels
+it **Library Scan Interval**. The default stays **3600 seconds (one hour)**, with
+an allowed range of 60-86400 seconds.
+
+| Library use | Suggested starting interval | Value |
+| --- | --- | --- |
+| Regular additions and reasonably quick scans | 1 hour (default) | `3600` |
+| Large library with occasional additions | 6 hours | `21600` |
+| Mostly unchanged archive | 24 hours | `86400` |
+
+The worker scans at startup, then waits the configured interval **after a scan
+finishes**. Manual Refresh can request work sooner and resets the scheduled wait
+after that work finishes. Scans remain sequential. For a multi-million-item
+library, start with six hours and adjust using measured scan duration and how
+quickly new media needs to appear. Use Refresh after imports when immediate
+updates are needed. A longer interval reduces repeated traversal and disk activity;
+it does not replace correct cache reuse or establish a supported library-size limit.
 
 ## Supported architectures
 

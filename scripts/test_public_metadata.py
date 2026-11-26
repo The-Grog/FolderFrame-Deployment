@@ -45,7 +45,7 @@ THUMBNAIL_OVERRIDES = {
     "Video Thumbnails": ("FOLDERFRAME_VIDEO_THUMBNAILS", "true"),
     "Generate Thumbnails": ("FOLDERFRAME_THUMBNAILS", "true"),
     "Persistent Media Manifest": ("FOLDERFRAME_MANIFEST", "true"),
-    "Thumbnail Scan Interval": ("FOLDERFRAME_THUMBNAIL_INTERVAL", "3600"),
+    "Library Scan Interval": ("FOLDERFRAME_THUMBNAIL_INTERVAL", "3600"),
 }
 TRANSCODE_OVERRIDES = {
     "Video Compatibility Fallback": ("FOLDERFRAME_VIDEO_TRANSCODE", "true"),

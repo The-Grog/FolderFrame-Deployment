@@ -13,6 +13,9 @@
 !upstream/embed.html
 !upstream/styles.css
 !upstream/app.js
+!upstream/about.js
+!upstream/scripts/
+!upstream/scripts/write_build_info.py
 !upstream/settings.js
 !upstream/resilience.js
 !upstream/vendor/

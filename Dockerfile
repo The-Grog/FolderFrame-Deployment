@@ -1,12 +1,19 @@
 FROM caddy:2-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
 ARG FFMPEG_VERSION=8.0.1-r1
+ARG APP_VERSION=""
+ARG APP_REVISION=""
+ARG DEPLOYMENT_REVISION=""
+LABEL org.opencontainers.image.version="$APP_VERSION" \
+      org.opencontainers.image.revision="$APP_REVISION" \
+      io.folderframe.deployment-revision="$DEPLOYMENT_REVISION"
 
 # upstream is checked out at the published release's immutable commit.
 # Never copy the entire repository or media directories.
-COPY upstream/index.html upstream/embed.html upstream/styles.css upstream/app.js upstream/settings.js upstream/resilience.js /srv/app/
+COPY upstream/index.html upstream/embed.html upstream/styles.css upstream/app.js upstream/about.js upstream/settings.js upstream/resilience.js /srv/app/
 COPY upstream/vendor/ /srv/app/vendor/
 COPY upstream/THIRD_PARTY_NOTICES.md /srv/app/THIRD_PARTY_NOTICES.md
 COPY upstream/LICENSE /srv/app/LICENSE
+COPY upstream/scripts/write_build_info.py /tmp/write_build_info.py
 COPY upstream/folderframe.config.json /usr/share/folderframe/folderframe.config.json
 COPY upstream/generate_thumbnails.py /usr/share/folderframe/generate_thumbnails.py
 COPY upstream/docs/images/folderframe-logo.png upstream/docs/images/folderframe-logo-back.png upstream/docs/images/folderframe-icon.png /srv/app/docs/images/
@@ -25,6 +32,8 @@ RUN apk add --no-cache jq python3 py3-pip py3-pillow "ffmpeg=${FFMPEG_VERSION}" 
     && chmod 0755 /usr/bin/folderframe-entrypoint \
     && chmod 0755 /usr/share/folderframe/thumbnail_worker.py \
     && chmod 0755 /usr/share/folderframe/generate_thumbnails.py \
+    && python3 /tmp/write_build_info.py --version "$APP_VERSION" --revision "$APP_REVISION" --deployment-revision "$DEPLOYMENT_REVISION" --output /srv/app/build-info.json \
+    && rm /tmp/write_build_info.py \
     && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 VOLUME ["/config"]

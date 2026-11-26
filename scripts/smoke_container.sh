@@ -6,8 +6,8 @@ platform=${2:?platform is required}
 expected_machine=${3:?expected machine is required}
 app_sha=${4:?app revision is required}
 suffix=${platform#linux/}
-name="folderframe-smoke-${suffix//\//-}"
 work=$(mktemp -d)
+name="folderframe-smoke-${suffix//\//-}-$(basename "$work")"
 config="$work/config"
 library="$work/library"
 archive="$work/archive"
@@ -56,12 +56,26 @@ Path("/work/archive.png").write_bytes(base64.b64decode(
 ))
 PY
 
+video_fixtures=(fallback.mov legacy.AVI legacy.wmv legacy.asf legacy.mpg legacy.mpeg legacy.mkv legacy.3gp legacy.3g2)
 docker run --rm --platform "$platform" --entrypoint sh \
-  -v "$archive:/work" "$image" -c \
-  'ffmpeg -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=64x48:rate=24 -f lavfi -i sine=frequency=440 -t 1 -c:v mpeg4 -c:a aac /work/fallback.mov'
+  -v "$archive:/work" "$image" -ec '
+    make_clip() {
+      ffmpeg -hide_banner -loglevel error -y -f lavfi -i testsrc2=size=64x48:rate=24 \
+        -f lavfi -i sine=frequency=440 -t 1 "$@"
+    }
+    make_clip -c:v mpeg4 -c:a aac /work/fallback.mov
+    make_clip -f avi -c:v mpeg4 -c:a libmp3lame /work/legacy.AVI
+    make_clip -c:v wmv2 -c:a wmav2 /work/legacy.wmv
+    cp /work/legacy.wmv /work/legacy.asf
+    make_clip -f mpeg -c:v mpeg1video -c:a mp2 /work/legacy.mpg
+    make_clip -f mpeg1video -c:v mpeg1video -an /work/legacy.mpeg
+    make_clip -c:v libx264 -c:a aac /work/legacy.mkv
+    make_clip -c:v mpeg4 -c:a aac /work/legacy.3gp
+    make_clip -c:v mpeg4 -c:a aac /work/legacy.3g2
+  '
 
 before_library=$(sha256sum "$library/library.jpg" "$library/library.heic" "$library/original-marker.txt")
-before_archive=$(sha256sum "$archive/archive.png" "$archive/fallback.mov")
+before_archive=$(sha256sum "$archive"/*)
 
 docker run -d --name "$name" --platform "$platform" -p 127.0.0.1::8080 \
   -v "$config:/config" \
@@ -113,6 +127,22 @@ curl --fail "$base/index.html?v=smoke-${app_sha}" -o "$work/deployed-index.html"
 grep -q 'function cycleGridDensity' "$work/deployed-app.js"
 grep -q 'function setScanProgressBar' "$work/deployed-app.js"
 grep -q 'id="btn-grid-density"' "$work/deployed-index.html"
+grep -q 'id="btn-about-grid"' "$work/deployed-index.html"
+curl --fail "$base/about.js" -o "$work/about.js"
+curl --fail "$base/build-info.json" -o "$work/build-info.json"
+expected_version=$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')
+expected_deployment=$(docker image inspect "$image" --format '{{ index .Config.Labels "io.folderframe.deployment-revision" }}')
+python3 - "$work/build-info.json" "$app_sha" "$expected_version" "$expected_deployment" <<'PY'
+import json, sys
+info = json.load(open(sys.argv[1], encoding="utf-8"))
+assert set(info) == {"schemaVersion", "version", "revision", "deploymentRevision"}
+assert info["schemaVersion"] == 1
+assert (info["version"] or "") == sys.argv[3]
+assert (info["deploymentRevision"] or "") == sys.argv[4]
+# Unstamped local builds intentionally report unknown; published images must match.
+if info["version"] or info["revision"]:
+    assert info["revision"] == sys.argv[2]
+PY
 grep -q 'id="scan-progress-track"' "$work/deployed-index.html"
 curl --fail "$base/folderframe.config.json" -o "$work/runtime-config.json"
 docker exec -i "$name" python3 - <<'PY'
@@ -166,13 +196,15 @@ for attempt in $(seq 1 90); do
   sleep 1
 done
 docker exec "$name" python3 -c 'import json; s=json.load(open("/config/folderframe-data/worker-status.json")); assert s.get("requestId") == "smoke_refresh", s'
-docker exec -i "$name" python3 - <<'PY'
+docker exec -i "$name" python3 - "${video_fixtures[@]}" <<'PY'
 import json
+import sys
+import sys
 from pathlib import Path
 root = Path("/config/folderframe-data")
 s = json.loads((root / "worker-status.json").read_text(encoding="utf-8"))
 assert s["outcome"] in {"complete", "complete_with_warnings"}, s
-assert s["mediaFiles"] == 4, s
+assert s["mediaFiles"] == 3 + len(sys.argv[1:]), s
 assert s["thumbnailsGenerated"] + s["thumbnailsCurrent"] >= 3, s
 m = json.loads((root / "library.json").read_text(encoding="utf-8"))
 assert m["version"] == 1
@@ -184,9 +216,14 @@ for descriptor in m["chunks"].values():
         records.update({record["path"]: record for record in directory["files"]})
 assert {"Archive/archive.png", "Archive/fallback.mov", "Library/library.jpg", "Library/library.heic"} <= set(records)
 assert records["Library/library.jpg"]["exifPath"] == "exif.d/Library/library.jpg.json"
-assert records["Archive/fallback.mov"]["thumbnailPath"] == "Archive/fallback.mov.webp"
+for name in sys.argv[1:]:
+    path = "Archive/" + name
+    assert records[path]["thumbnailPath"] == path + ".webp", records[path]
+    # Raw video streams lack the container timing metadata of the other fixtures.
+    if name != "legacy.mpeg":
+        assert records[path]["duration"] > 0, records[path]
 PY
-docker exec -i "$name" python3 - <<'PY'
+docker exec -i "$name" python3 - "${video_fixtures[@]}" <<'PY'
 import json
 s = json.load(open('/config/folderframe-data/worker-status.json', encoding="utf-8"))
 assert s["version"] == 1
@@ -220,16 +257,18 @@ curl --fail "$base/folderframe-data/exif.d/Library/library.jpg.json" -o "$work/l
 test -s "$work/library-thumb.webp"
 test -s "$work/heic-thumb.webp"
 docker exec "$name" python3 -c 'import json; assert json.load(open("/config/folderframe-data/exif.d/Library/library.jpg.json", encoding="utf-8"))["captureDate"]'
-curl --fail --max-time 60 "$base/folderframe-api/transcode?path=Archive%2Ffallback.mov" -o "$work/fallback.mp4"
-docker run --rm --platform "$platform" -i --entrypoint ffmpeg "$image" \
-  -hide_banner -loglevel error -i pipe:0 -f null - < "$work/fallback.mp4"
+for fixture in "${video_fixtures[@]}"; do
+  curl --fail --max-time 60 "$base/folderframe-api/transcode?path=Archive%2F$fixture" -o "$work/fallback.mp4"
+  docker run --rm --platform "$platform" -i --entrypoint ffmpeg "$image" \
+    -hide_banner -loglevel error -xerror -i pipe:0 -map 0:v:0 -f null - < "$work/fallback.mp4"
+done
 
 if docker exec "$name" sh -c 'touch /media/Library/should-not-write'; then
   echo 'read-only media mount accepted a write' >&2
   exit 1
 fi
 after_library=$(sha256sum "$library/library.jpg" "$library/library.heic" "$library/original-marker.txt")
-after_archive=$(sha256sum "$archive/archive.png" "$archive/fallback.mov")
+after_archive=$(sha256sum "$archive"/*)
 test "$before_library" = "$after_library"
 test "$before_archive" = "$after_archive"
 

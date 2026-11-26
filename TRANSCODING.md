@@ -6,11 +6,13 @@ Caddy's same-origin `/folderframe-api/*` route. No extra public port or user API
 URL is needed. `service_runner.py` supervises Caddy, the API, and the existing
 thumbnail worker, forwarding shutdown to their process groups and reaping them.
 
-The browser tries every original natively. Only a MediaError decode/unsupported
-source failure and a successful original HTTP check allow one fallback per
-viewer load. Autoplay denial, missing files, network stalls, and timeouts do not
-request conversion. Native-compatible MOV/MP4/HEVC files bypass FFmpeg entirely.
-Static-only installations have no service and continue using normal recovery UI.
+The browser tries the original first. A decode or unsupported source error
+can trigger one automatic fallback per viewer load after a successful original
+HTTP check. When the compatibility service is enabled, **Viewer options** also
+offers **Try compatible playback**, including when the original plays audio
+without showing video. The compatible stream starts from the beginning.
+Autoplay denial, network stalls, and timeouts do not trigger automatic conversion.
+Static installations offer **Open original** if browser playback fails.
 
 ## Contract and settings
 
@@ -47,8 +49,9 @@ ffmpeg -hide_banner -loglevel error -nostdin \
   -frag_duration 1000000 -f mp4 pipe:1
 ```
 
-WebM uses the Matroska demuxer and omits the MOV-specific dref options. Bytes
-identify the container; extension alone never invokes conversion. No playlist
+WebM and MKV use the Matroska demuxer, and 3GP/3G2 use the MOV demuxer. AVI and
+WMV/ASF use the AVI and ASF demuxers. MPG/MPEG accepts MPEG program streams and
+raw MPEG video. The service chooses a local demuxer using the file header. No playlist
 demuxers or external URL protocols are enabled. H.264/yuv420p + AAC stereo is
 the compatibility output. Hardware acceleration is not implemented; no GPU
 device/runtime or privileged mode is required. HDR/Dolby Vision color fidelity
